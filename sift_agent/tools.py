@@ -69,9 +69,14 @@ class SubprocessRunner:
             return 1, '', str(e)
 
 def process_output(stdout: str, stderr: str, returncode: int) -> tuple[str, bool, bool]:
-    failed = returncode != 0 and not stdout.strip()
+    # Warnings on stderr are benign, but a non-zero exit is a failure even if Volatility already
+    # printed its banner and column header, so an empty table from a crash is never read as "no rows"
+    failed = returncode != 0
     if failed:
-        return stderr, True, False
+        tail = '\n'.join(stderr.strip().splitlines()[-4:]) or 'no error text'
+        rows = [l for l in stdout.splitlines() if l.strip() and not l.startswith('Volatility 3 Framework')]
+        note = f' Partial output before the failure: {len(rows) - 1} data rows.' if len(rows) > 1 else ' No data rows were produced.'
+        return f'Plugin exited with code {returncode}.{note} Error: {tail}', True, False
 
     lines = stdout.splitlines()
     if not lines:
