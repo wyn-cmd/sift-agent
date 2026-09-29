@@ -3,7 +3,7 @@ import re
 from typing import List, Dict, Any
 from sift_agent.audit import AuditLog
 
-def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncated_plugins: List[str], calls_used: int, rate_limit_approached: bool) -> str:
+def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncated_plugins: List[str], calls_used: int, rate_limit_approached: bool, plugins_not_run: List[str] | None = None) -> str:
     validated_findings = []
     for f in findings:
         claim = f.get('claim', '')
@@ -27,7 +27,9 @@ def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncat
                 elif excerpt.strip():
                     norm = lambda t: re.sub(r'\s+', ' ', t).strip().lower()
                     raws = [audit_log.read_raw(cid) or '' for cid in tool_call_ids]
-                    if not any(norm(excerpt) in norm(r) for r in raws):
+                    # Each excerpt line must appear verbatim in a cited output; rows need not be adjacent
+                    lines = [norm(x) for x in excerpt.splitlines() if x.strip()]
+                    if not all(any(l in norm(r) for r in raws) for l in lines):
                         status = 'unconfirmed inference'
 
         validated_findings.append({
@@ -49,6 +51,7 @@ def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncat
         '## Limitations',
         f"- Truncated plugins: {', '.join(truncated_plugins) if truncated_plugins else 'None'}",
         f"- Calls used vs cap: {calls_used} / 15",
+        f"- Plugins never run: {', '.join(plugins_not_run) if plugins_not_run else 'None'}",
         f"- Rate limit approached: {'Yes' if rate_limit_approached else 'No'}"
     ])
 

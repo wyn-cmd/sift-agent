@@ -49,3 +49,12 @@ def test_build_report_validates_model_findings(tmp_path):
     rep = Agent(L(), R(), audit, rl, 'e.raw').build_report()
     assert rep.count('Status: confirmed') == 1
     assert 'Status: unconfirmed inference' in rep and 'Calls used vs cap: 1 / 15' in rep
+
+# Non-adjacent real rows are accepted, but one invented row among them downgrades the claim
+def test_multi_row_excerpt_needs_every_line_real(tmp_path):
+    audit = AuditLog(tmp_path / 'a.jsonl')
+    cid = audit.log_tool('windows.netscan', {}, 'h\n1 aaa\n2 filler\n3 bbb\n4 more\n5 ccc')
+    ok = {'claim': 'c', 'status': 'confirmed', 'tool_call_ids': [cid], 'excerpt': '1 aaa\n3 bbb\n5 ccc'}
+    bad = {'claim': 'c', 'status': 'confirmed', 'tool_call_ids': [cid], 'excerpt': '1 aaa\n9 fake'}
+    rep = generate_report([ok, bad], audit, [], 1, False)
+    assert rep.count('Status: confirmed') == 1 and rep.count('Status: unconfirmed inference') == 1

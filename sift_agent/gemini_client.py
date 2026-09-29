@@ -26,6 +26,8 @@ class GeminiClient:
             text = m.get('content', '') or ''
             if role == 'system':
                 system = text
+            elif role == 'user':
+                contents.append({'role': 'user', 'parts': [{'text': text}]})
             elif role == 'assistant':
                 contents.append({'role': 'model', 'parts': [{'text': text}]})
             elif role == 'tool':

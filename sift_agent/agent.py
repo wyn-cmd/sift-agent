@@ -1,6 +1,6 @@
 import json
 from typing import Protocol, List, Dict, Any, Optional
-from sift_agent.guardrails import check_tool, ToolNotAllowed
+from sift_agent.guardrails import check_tool, ToolNotAllowed, ALLOWED_TOOLS
 from sift_agent.audit import AuditLog
 from sift_agent.tools import Runner, process_output
 from sift_agent.rate_limiter import RateLimiter
@@ -49,21 +49,42 @@ class LLMClient(Protocol):
         ...
 
 class Agent:
-    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str):
+    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str, require_all_tools: bool = True, max_nudges: int = 3):
         self.llm = llm
         self.runner = runner
         self.audit_log = audit_log
         self.rate_limiter = rate_limiter
         self.evidence_path = evidence_path
         self.tool_calls_count = 0
+        self.require_all_tools = require_all_tools
+        self.max_nudges = max_nudges
+        self.nudges = 0
+        self.tools_run = set()
         self.truncated_plugins = []
         self.rate_limit_approached = False
+
+    # Plugins the model has not yet run, in a stable order
+    def missing_tools(self) -> list[str]:
+        return sorted(ALLOWED_TOOLS - self.tools_run)
+
+    # If the model tries to stop early, push it back into the loop with a user turn. Returns True
+    # when a nudge was sent. Bounded, so a stubborn model still ends and the gap is reported.
+    def nudge_if_early(self, messages: list[dict]) -> bool:
+        missing = self.missing_tools()
+        if not self.require_all_tools or not missing:
+            return False
+        if self.nudges >= self.max_nudges or self.tool_calls_count >= 15:
+            return False
+        self.nudges += 1
+        messages.append({'role': 'user', 'content': 'You have not yet run: ' + ', '.join(missing) +
+                         '. Run each of them and review the output before giving the final JSON findings.'})
+        return True
 
     # Run the investigation, then validate the model's JSON findings into the final report
     def build_report(self) -> str:
         answer = self.run()
         return generate_report(parse_findings(answer), self.audit_log, self.truncated_plugins,
-                               self.tool_calls_count, self.rate_limit_approached)
+                               self.tool_calls_count, self.rate_limit_approached, self.missing_tools())
 
     def run(self) -> str:
         messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
@@ -82,7 +103,9 @@ class Agent:
                 messages.append({'role': 'assistant', 'content': response['content']})
                 final_answer = response['content']
 
-            if 'conclude' in response and response['conclude']:
+            if 'conclude' in response and response['conclude'] and not (response.get('tool_calls')):
+                if self.nudge_if_early(messages):
+                    continue
                 concluded = True
                 break
 
@@ -107,6 +130,7 @@ class Agent:
                         break
 
                     self.tool_calls_count += 1
+                    self.tools_run.add(tool_name)
                     plugin_name = tool_name.split('.')[1]
                     retcode, stdout, stderr = self.runner.run(tool_name, self.evidence_path)
                     processed, failed, truncated = process_output(stdout, stderr, retcode)
@@ -126,7 +150,7 @@ class Agent:
                         'content': processed_data
                     })
             else:
-                if not concluded:
+                if not concluded and not self.nudge_if_early(messages):
                     concluded = True
 
         return final_answer
