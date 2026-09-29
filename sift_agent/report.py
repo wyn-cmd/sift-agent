@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Dict, Any
 from sift_agent.audit import AuditLog
 
@@ -22,6 +23,12 @@ def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncat
                         break
                 if not all_exist:
                     status = 'unconfirmed inference'
+                # A confirmed claim must quote text that really appears in a cited raw output
+                elif excerpt.strip():
+                    norm = lambda t: re.sub(r'\s+', ' ', t).strip().lower()
+                    raws = [audit_log.read_raw(cid) or '' for cid in tool_call_ids]
+                    if not any(norm(excerpt) in norm(r) for r in raws):
+                        status = 'unconfirmed inference'
 
         validated_findings.append({
             'claim': claim,
@@ -46,3 +53,25 @@ def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncat
     ])
 
     return '\n'.join(report_lines)
+
+
+# Pull the JSON findings list out of the model's final answer, tolerating code fences and prose.
+# Anything unparseable becomes one unconfirmed inference so the text is never silently dropped.
+def parse_findings(answer: str) -> List[Dict[str, Any]]:
+    text = answer.strip()
+    fence = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL)
+    candidates = [fence.group(1)] if fence else []
+    start, end = text.find('['), text.rfind(']')
+    if start != -1 and end > start:
+        candidates.append(text[start:end + 1])
+    for c in candidates:
+        try:
+            data = json.loads(c)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, list) and all(isinstance(x, dict) for x in data):
+            return [{'claim': str(x.get('claim', '')),
+                     'status': str(x.get('status', 'inference')),
+                     'tool_call_ids': [str(i) for i in x.get('tool_call_ids', []) if isinstance(i, str)],
+                     'excerpt': str(x.get('excerpt', ''))} for x in data]
+    return [{'claim': text[:1500], 'status': 'unconfirmed inference', 'tool_call_ids': [], 'excerpt': ''}]

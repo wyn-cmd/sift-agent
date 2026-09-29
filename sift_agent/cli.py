@@ -44,7 +44,7 @@ def main():
         agent = Agent(llm, runner, audit_log, rate_limiter, str(ev_path))
         # Surface API failures as a clean error and log them instead of a traceback
         try:
-            final_answer = agent.run()
+            final_answer = agent.build_report()
         except Exception as e:
             audit_log.log_event('agent run failed', {'error': str(e)[:500]})
             print(f"Error during investigation: {str(e)[:300]}", file=sys.stderr)
