@@ -3,8 +3,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Raised when the persisted daily request count reaches its cap
+class DailyLimitReached(RuntimeError):
+    pass
+
+# Defaults are the free tier limits observed on the author's account at build time, not a
+# published guarantee, so real 429 responses are also handled by the agent loop
 class RateLimiter:
-    def __init__(self, rpm_limit: int = 15, tpm_limit: int = 100000, rpd_limit: int = 1500, state_file: str = 'api_usage.json', clock=time.time, sleep=time.sleep):
+    def __init__(self, rpm_limit: int = 15, tpm_limit: int = 250000, rpd_limit: int = 500, state_file: str = 'api_usage.json', clock=time.time, sleep=time.sleep):
         self.rpm_limit = rpm_limit
         self.tpm_limit = tpm_limit
         self.rpd_limit = rpd_limit
@@ -43,7 +49,7 @@ class RateLimiter:
                 data = {}
         current_count = data.get(today, 0)
         if current_count >= self.rpd_limit:
-            raise RuntimeError('RPD limit reached')
+            raise DailyLimitReached('RPD limit reached')
         data[today] = current_count + 1
         try:
             with open(self.state_file, 'w', encoding='utf-8') as f:

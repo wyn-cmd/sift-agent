@@ -3,7 +3,8 @@ from typing import Protocol, List, Dict, Any, Optional
 from sift_agent.guardrails import check_tool, ToolNotAllowed, ALLOWED_TOOLS
 from sift_agent.audit import AuditLog
 from sift_agent.tools import Runner, process_output
-from sift_agent.rate_limiter import RateLimiter
+import re
+from sift_agent.rate_limiter import RateLimiter, DailyLimitReached
 from sift_agent.report import generate_report, parse_findings
 
 # System prompt embodying the five required clauses
@@ -63,6 +64,23 @@ class Agent:
         self.truncated_plugins = []
         self.rate_limit_approached = False
 
+    # Call the model, and on a real 429 wait for the delay the API reports (default 65s) and retry.
+    # Other errors, and a 429 that persists after two retries, propagate to the caller.
+    def chat_with_backoff(self, messages: list[dict], retries: int = 2) -> dict:
+        for attempt in range(retries + 1):
+            try:
+                return self.llm.chat(messages, TOOL_SCHEMAS)
+            except Exception as e:
+                text = str(e)
+                if attempt == retries or not ('429' in text or 'RESOURCE_EXHAUSTED' in text):
+                    raise
+                m = re.search(r'retry in ([0-9.]+)s', text) or re.search(r"retryDelay['\": ]+([0-9.]+)s", text)
+                delay = min(float(m.group(1)) + 1 if m else 65.0, 120.0)
+                self.rate_limit_approached = True
+                self.audit_log.log_event('rate limited by API', {'attempt': attempt + 1, 'wait_seconds': delay})
+                self.rate_limiter.back_off(delay)
+        raise RuntimeError('unreachable')
+
     # Plugins the model has not yet run, in a stable order
     def missing_tools(self) -> list[str]:
         return sorted(ALLOWED_TOOLS - self.tools_run)
@@ -97,10 +115,15 @@ class Agent:
             text_len = sum(len(m.get('content', '')) for m in messages)
             try:
                 self.rate_limiter.check_and_consume(estimated_tokens=max(100, text_len // 4))
+            except DailyLimitReached:
+                # The daily cap is a hard stop: log it and end with what has been gathered so far
+                self.rate_limit_approached = True
+                self.audit_log.log_event('daily request limit reached', {})
+                break
             except Exception:
                 self.rate_limit_approached = True
 
-            response = self.llm.chat(messages, TOOL_SCHEMAS)
+            response = self.chat_with_backoff(messages)
             if 'content' in response and response['content']:
                 messages.append({'role': 'assistant', 'content': response['content']})
                 final_answer = response['content']
@@ -144,7 +167,7 @@ class Agent:
                     else:
                         processed_data = f"[UNTRUSTED TOOL OUTPUT] {processed}"
 
-                    call_id = self.audit_log.log_tool(tool_name, call.get('arguments', {}) or {}, stdout if stdout.strip() or not stderr else stderr, processed)
+                    call_id = self.audit_log.log_tool(tool_name, call.get('arguments', {}) or {}, stdout + ('\n[stderr]\n' + stderr if failed and stderr else ''), processed)
                     messages.append({
                         'role': 'tool',
                         'name': tool_name,
