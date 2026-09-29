@@ -1,0 +1,21 @@
+Volatility 3 Framework 2.28.2
+
+PID	Process	Args
+
+4	System	-
+368	smss.exe	\SystemRoot\System32\smss.exe
+584	csrss.exe	C:\WINDOWS\system32\csrss.exe ObjectDirectory=\Windows SharedSection=1024,3072,512 Windows=On SubSystemType=Windows ServerDll=basesrv,1 ServerDll=winsrv:UserServerDllInitialization,3 ServerDll=winsrv:ConServerDllInitialization,2 ProfileControl=Off MaxRequestThreads=16
+608	winlogon.exe	winlogon.exe
+652	services.exe	C:\WINDOWS\system32\services.exe
+664	lsass.exe	C:\WINDOWS\system32\lsass.exe
+824	svchost.exe	C:\WINDOWS\system32\svchost -k DcomLaunch
+908	svchost.exe	C:\WINDOWS\system32\svchost -k rpcss
+1004	svchost.exe	C:\WINDOWS\System32\svchost.exe -k netsvcs
+1056	svchost.exe	C:\WINDOWS\system32\svchost.exe -k NetworkService
+1220	svchost.exe	C:\WINDOWS\system32\svchost.exe -k LocalService
+1484	explorer.exe	C:\WINDOWS\Explorer.EXE
+1512	spoolsv.exe	C:\WINDOWS\system32\spoolsv.exe
+1640	reader_sl.exe	"C:\Program Files\Adobe\Reader 9.0\Reader\Reader_sl.exe" 
+788	alg.exe	C:\WINDOWS\System32\alg.exe
+1136	wuauclt.exe	"C:\WINDOWS\system32\wuauclt.exe" /RunStoreAsComServer Local\[3ec]SUSDSb81eb56fa3105543beb3109274ef8ec1
+1588	wuauclt.exe	"C:\WINDOWS\system32\wuauclt.exe"

@@ -1,0 +1,21 @@
+Volatility 3 Framework 2.28.2
+
+PID	PPID	ImageFileName	Offset(V)	Threads	Handles	SessionId	Wow64	CreateTime	ExitTime	File output
+
+4	0	System	0x823c89c8	53	240	N/A	False	N/A	N/A	Disabled
+368	4	smss.exe	0x822f1020	3	19	N/A	False	2012-07-22 02:42:31.000000 UTC	N/A	Disabled
+584	368	csrss.exe	0x822a0598	9	326	0	False	2012-07-22 02:42:32.000000 UTC	N/A	Disabled
+608	368	winlogon.exe	0x82298700	23	519	0	False	2012-07-22 02:42:32.000000 UTC	N/A	Disabled
+652	608	services.exe	0x81e2ab28	16	243	0	False	2012-07-22 02:42:32.000000 UTC	N/A	Disabled
+664	608	lsass.exe	0x81e2a3b8	24	330	0	False	2012-07-22 02:42:32.000000 UTC	N/A	Disabled
+824	652	svchost.exe	0x82311360	20	194	0	False	2012-07-22 02:42:33.000000 UTC	N/A	Disabled
+908	652	svchost.exe	0x81e29ab8	9	226	0	False	2012-07-22 02:42:33.000000 UTC	N/A	Disabled
+1004	652	svchost.exe	0x823001d0	64	1118	0	False	2012-07-22 02:42:33.000000 UTC	N/A	Disabled
+1056	652	svchost.exe	0x821dfda0	5	60	0	False	2012-07-22 02:42:33.000000 UTC	N/A	Disabled
+1220	652	svchost.exe	0x82295650	15	197	0	False	2012-07-22 02:42:35.000000 UTC	N/A	Disabled
+1484	1464	explorer.exe	0x821dea70	17	415	0	False	2012-07-22 02:42:36.000000 UTC	N/A	Disabled
+1512	652	spoolsv.exe	0x81eb17b8	14	113	0	False	2012-07-22 02:42:36.000000 UTC	N/A	Disabled
+1640	1484	reader_sl.exe	0x81e7bda0	5	39	0	False	2012-07-22 02:42:36.000000 UTC	N/A	Disabled
+788	652	alg.exe	0x820e8da0	7	104	0	False	2012-07-22 02:43:01.000000 UTC	N/A	Disabled
+1136	1004	wuauclt.exe	0x821fcda0	8	173	0	False	2012-07-22 02:43:46.000000 UTC	N/A	Disabled
+1588	1004	wuauclt.exe	0x8205bda0	5	132	0	False	2012-07-22 02:44:01.000000 UTC	N/A	Disabled

@@ -1,0 +1,27 @@
+Volatility 3 Framework 2.28.2
+
+Offset	Proto	LocalAddr	LocalPort	ForeignAddr	ForeignPort	State	PID	Owner	Created
+
+[stderr]
+WARNING  volatility3.framework.layers.vmware: No metadata file found alongside VMEM file. A VMSS or VMSN file may be required to correctly process a VMEM file. These should be placed in the same directory with the same file name, e.g. cridex.vmem and cridex.vmss.
+Traceback (most recent call last):
+  File "/redacted/.venv/bin/vol", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/cli/__init__.py", line 942, in main
+    CommandLine().run()
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/cli/__init__.py", line 527, in run
+    renderer.render(grid)
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/cli/text_renderer.py", line 330, in render
+    grid.populate(visitor, outfd)
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/framework/renderers/__init__.py", line 318, in populate
+    for level, item in self._generator:
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/framework/plugins/windows/netscan.py", line 390, in _generator
+    netscan_symbol_table = self.create_netscan_symbol_table(
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/framework/plugins/windows/netscan.py", line 347, in create_netscan_symbol_table
+    symbol_filename, class_types = cls.determine_tcpip_version(
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/redacted/.venv/lib/python3.12/site-packages/volatility3/framework/plugins/windows/netscan.py", line 318, in determine_tcpip_version
+    raise NotImplementedError(
+NotImplementedError: This version of Windows is not supported: 5.1 15.2600!
