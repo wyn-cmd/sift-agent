@@ -22,18 +22,33 @@ Every tool call is written to runs/audit.jsonl with its real arguments, the SHA-
     mkdir -p evidence && cp /path/to/image.raw evidence/
     .venv/bin/python -m sift_agent run --evidence image.raw --model gemini-3.5-flash-lite
 
-The key is read only from the environment and is never written to disk. Volatility 3 installs a command called vol. On the first run against a Windows image it downloads the matching symbol table, which took about 90 seconds and needs internet access. A built-in rate limiter keeps requests under the free tier limits, and a run is capped at 15 tool calls.
+The key is read only from the environment and is never written to disk. Volatility 3 installs a command called vol. On the first run against a Windows image it downloads the matching symbol table, which took about a minute on my connection and needs internet access. The built-in rate limiter defaults to 15 requests per minute, 250,000 tokens per minute and 500 requests per day, which are the free tier limits I observed on my own account at build time. Google does not publish these as a guarantee, so the agent also waits and retries when the API returns a real 429, and it stops cleanly when the daily count is reached. A run is capped at 15 tool calls.
 
 ## Tests
 
     .venv/bin/python -m pytest -q
 
-The 26 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
+The 34 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
 
 ## What has been tested for real
 
-The agent has been run about a dozen times on MemLabs Lab 4 (github.com/stuxnet999/MemLabs), a public Windows 7 SP1 x64 image, with gemini-3.5-flash-lite. Every run called all four plugins, and the findings I checked against fresh Volatility output were correct. Runs typically produced two or three confirmed findings such as process ids and command lines. One run produced no confirmed findings and could not be reproduced.
+The main evaluation is on Cridex (cridex.vmem, Windows XP SP3, 536,870,912 bytes), the sample the project was specified against. Across three runs with gemini-3.5-flash-lite the agent always found reader_sl.exe (PID 1640) and its command line, and none of the 11 confirmed claims was contradicted by fresh Volatility output. It never called the process suspicious, and it never found the port 8080 connection, because windows.netscan does not support Windows XP in Volatility 3 and the run reports that failure honestly. The full comparison against the ground truth is in accuracy.md. I also ran the agent more than a dozen times on MemLabs Lab 4 (github.com/stuxnet999/MemLabs), a Windows 7 SP1 x64 image where all four plugins work, and it reported process ids and command lines that matched the Volatility output.
+
+A complete real run, with its audit log and every raw plugin output, is committed under examples/cridex-run/ (local paths removed). The audit log holds one line per tool call, for example the pslist call:
+
+    {"tool": "windows.pslist", "args": {}, "raw_output_sha256": "e6c729c7...", "raw_output_len": 1621, "raw_output_file": "raw/f454c769-....txt", ...}
+
+The matching report lists each finding with its status, call ids and excerpt:
+
+    - Claim: Process reader_sl.exe is running with PID 1640 and path C:\Program Files\Adobe\Reader 9.0\Reader\Reader_sl.exe.
+      Status: confirmed
+      Tool Call IDs: f454c769-702a-4583-80ae-c2c2e62c1422, cc42b56c-0249-4c4d-b377-8969d8328597
+      Excerpt: 1640 1484 reader_sl.exe 0x81e7bda0 5 39 0 False 2012-07-22 02:42:36.000000 UTC N/A Disabled
 
 ## Limitations
 
-The agent reports facts it can read from tables, such as which process has which command line. It has not been shown to spot a real intrusion. Lab 4 is about a deleted file, which none of these four plugins can find, and its write-up is public, so a model may have seen it. Only Windows 7 and later images have been tried, and Windows XP images are not expected to work with windows.netscan. The excerpt check proves a quote is real, not that the conclusion drawn from it is right. The memory images themselves are not in this repository.
+This is a training and portfolio exercise against public samples with known ground truth, not production DFIR tooling, and it does not claim to detect malware in general. It triages one memory image with four read-only plugins under a citation constraint, and it does not replace an analyst. The evidence is only read and the malware is never executed, but for a real sample you should still work in an isolated VM with the network disabled. On Cridex the agent read the tables correctly but did not flag the malicious process, and on Windows XP images windows.netscan fails, so no network findings are possible with these four plugins. The excerpt check proves a quote is real, not that the conclusion drawn from it is right. The Lab 4 write-up is public, so a model may have seen it. Only three runs were made on Cridex, and the memory images are not in this repository.
+
+## Licence
+
+MIT, see LICENSE. Volatility 3 has its own licence (the Volatility Software License) and is installed from PyPI and called only as a subprocess, so none of its code is included here.
