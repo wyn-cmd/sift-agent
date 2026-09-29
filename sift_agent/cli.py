@@ -16,7 +16,7 @@ def main():
 
     run_parser = subparsers.add_parser('run')
     run_parser.add_argument('--evidence', required=True, help='Path to evidence file')
-    run_parser.add_argument('--model', default='gemini-2.5-flash-lite', help='Gemini model name')
+    run_parser.add_argument('--model', default='gemini-3.5-flash-lite', help='Gemini model name')
 
     args = parser.parse_args()
     if args.command == 'run':
@@ -28,7 +28,7 @@ def main():
 
         api_key = os.environ.get('GEMINI_API_KEY')
         if not api_key:
-            print("Error: GEMINI_API_KEY environment variable never read from file, must be in env", file=sys.stderr)
+            print("Error: the GEMINI_API_KEY environment variable is not set. The key is read only from the environment.", file=sys.stderr)
             sys.exit(1)
 
         audit_log = AuditLog(Path('runs/audit.jsonl'))
