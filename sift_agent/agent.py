@@ -83,6 +83,8 @@ class Agent:
     # Run the investigation, then validate the model's JSON findings into the final report
     def build_report(self) -> str:
         answer = self.run()
+        # Keep the model's raw final answer so a bad parse can be diagnosed later
+        self.audit_log.log_event('final model answer', {'answer': answer[:20000]})
         return generate_report(parse_findings(answer), self.audit_log, self.truncated_plugins,
                                self.tool_calls_count, self.rate_limit_approached, self.missing_tools())
 

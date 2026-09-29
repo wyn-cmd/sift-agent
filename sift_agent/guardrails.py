@@ -1,6 +1,7 @@
+import os
 from pathlib import Path
-# Lock evidence path
-EVIDENCE_DIR = Path('/media/eurae/Hard Drive/github-repos/sift-agent/evidence').resolve()
+# Evidence is locked to one directory: SIFT_EVIDENCE_DIR if set, otherwise ./evidence in the repo
+EVIDENCE_DIR = Path(os.environ.get('SIFT_EVIDENCE_DIR') or Path(__file__).resolve().parent.parent / 'evidence').resolve()
 ALLOWED_TOOLS = {'windows.info', 'windows.pslist', 'windows.netscan', 'windows.cmdline'}
 
 class ToolNotAllowed(Exception):

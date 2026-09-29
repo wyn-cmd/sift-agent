@@ -58,3 +58,16 @@ def test_multi_row_excerpt_needs_every_line_real(tmp_path):
     bad = {'claim': 'c', 'status': 'confirmed', 'tool_call_ids': [cid], 'excerpt': '1 aaa\n9 fake'}
     rep = generate_report([ok, bad], audit, [], 1, False)
     assert rep.count('Status: confirmed') == 1 and rep.count('Status: unconfirmed inference') == 1
+
+# The raw final answer is written to the audit log so a bad run can be diagnosed
+def test_final_answer_is_logged(tmp_path):
+    audit = AuditLog(tmp_path / 'a.jsonl')
+    class L:
+        def chat(self, messages, tools):
+            return {'content': 'not json at all', 'conclude': True}
+    class R:
+        def run(self, plugin, ev):
+            return 0, 'x', ''
+    Agent(L(), R(), audit, RateLimiter(state_file=str(tmp_path / 'u.json')), 'e.raw', require_all_tools=False).build_report()
+    events = [json.loads(l) for l in open(tmp_path / 'a.jsonl')]
+    assert any(e.get('event_type') == 'final model answer' and 'not json at all' in json.dumps(e) for e in events)
