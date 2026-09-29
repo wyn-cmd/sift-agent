@@ -1,0 +1,3 @@
+volatility3
+google-genai
+pytest
