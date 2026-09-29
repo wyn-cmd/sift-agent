@@ -229,3 +229,11 @@ def test_report_downgrades_uncited_confirmed(tmp_path):
     report = generate_report(findings, audit, [], 5, False)
     assert 'Status: confirmed' in report
     assert 'Status: unconfirmed inference' in report
+
+# Test that the Volatility banner and blank line are stripped and the real header leads the output
+def test_process_output_strips_volatility_banner():
+    raw = 'Volatility 3 Framework 2.28.2\n\nPID\tPPID\tImageFileName\n4\t0\tSystem\n'
+    processed, failed, truncated = process_output(raw, '', 0)
+    assert processed.splitlines()[0].startswith('PID')
+    assert 'Volatility 3 Framework' not in processed
+    assert not failed and not truncated

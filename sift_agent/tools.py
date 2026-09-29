@@ -77,8 +77,16 @@ def process_output(stdout: str, stderr: str, returncode: int) -> tuple[str, bool
     if not lines:
         return stdout, False, False
 
+    # Volatility prints a banner and blank lines before the column header; drop them so the
+    # real header is preserved and ranked rows are only data
+    start = 0
+    while start < len(lines) and (not lines[start].strip() or lines[start].startswith('Volatility 3 Framework')):
+        start += 1
+    lines = lines[start:]
+    if not lines:
+        return '', False, False
     header = lines[0]
-    data_lines = lines[1:]
+    data_lines = [l for l in lines[1:] if l.strip()]
 
     def score_line(line: str) -> int:
         return suspicion_score(line)
