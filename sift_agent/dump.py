@@ -44,9 +44,18 @@ def dump_and_hash(runner, evidence: str, pslist_raw: str, dump_dir: Path, audit_
     dump_dir.mkdir(parents=True, exist_ok=True)
     for pid, name in pick_pids(pslist_raw, limit):
         before = {p.name for p in dump_dir.iterdir()}
-        rc, out, err = runner.dump(evidence, pid, str(dump_dir))
-        files = sorted(p for p in dump_dir.iterdir() if p.name not in before and p.is_file())
-        entry = {'pid': pid, 'name': name, 'files': []}
+        method = 'windows.dumpfiles'
+        rc, out, err = runner.dump_files(evidence, pid, str(dump_dir)) if hasattr(runner, 'dump_files') else (1, '', '')
+        # Keep only the process's own executable image; dumpfiles also writes every loaded DLL
+        files = sorted(p for p in dump_dir.iterdir() if p.name not in before and p.is_file()
+                       and p.name.lower().endswith(f'.{name.lower()}.img'))
+        # Fall back to the in-memory dump when dumpfiles fails or finds no executable image
+        if not files:
+            method = 'windows.pslist --dump'
+            before = {p.name for p in dump_dir.iterdir()}
+            rc, out, err = runner.dump(evidence, pid, str(dump_dir))
+            files = sorted(p for p in dump_dir.iterdir() if p.name not in before and p.is_file())
+        entry = {'pid': pid, 'name': name, 'method': method, 'files': []}
         if rc != 0 or not files:
             entry['error'] = f'dump exited with code {rc}' if rc != 0 else 'no files were written'
         for p in files:
@@ -61,9 +70,9 @@ def dump_and_hash(runner, evidence: str, pslist_raw: str, dump_dir: Path, audit_
 
 def format_hash_section(results: list[dict]) -> list[str]:
     lines = ['## Dumped file hashes', '',
-             'These are SHA-256 hashes of images reconstructed from memory. They usually differ from the on-disk file, so a VirusTotal miss does not mean the file is clean.', '']
+             'These are SHA-256 hashes of images reconstructed from memory. Pages that were never loaded are zero-filled, so they can still differ from the on-disk file, and a VirusTotal miss does not mean the file is clean.', '']
     for r in results:
-        lines.append(f"- PID {r['pid']} {r['name']}")
+        lines.append(f"- PID {r['pid']} {r['name']} (via {r.get('method', 'unknown')})")
         if r.get('error'):
             lines.append(f"  Error: {r['error']}")
         for f in r['files']:

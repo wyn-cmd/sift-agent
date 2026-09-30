@@ -68,6 +68,16 @@ class SubprocessRunner:
         except Exception as e:
             return 1, '', str(e)
 
+    # Dump a process's mapped files with windows.dumpfiles. This yields the reconstructed .img of
+    # the executable, which is closer to the on-disk file than the pslist memory dump
+    def dump_files(self, evidence_path: str, pid: int, out_dir: str) -> tuple[int, str, str]:
+        cmd = [find_vol(), '-q', '-f', evidence_path, '-o', out_dir, 'windows.dumpfiles', '--pid', str(pid)]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            return res.returncode, res.stdout, res.stderr
+        except Exception as e:
+            return 1, '', str(e)
+
     # Dump one process image into out_dir with windows.pslist --dump; the caller hashes the files
     def dump(self, evidence_path: str, pid: int, out_dir: str) -> tuple[int, str, str]:
         cmd = [find_vol(), '-q', '-f', evidence_path, '-o', out_dir, 'windows.pslist', '--pid', str(pid), '--dump']
