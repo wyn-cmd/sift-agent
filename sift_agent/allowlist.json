@@ -1,0 +1,3 @@
+{
+  "tools": ["windows.info", "windows.pslist", "windows.netscan", "windows.cmdline"]
+}

@@ -1,8 +1,18 @@
+import json
 import os
 from pathlib import Path
 # Evidence is locked to one directory: SIFT_EVIDENCE_DIR if set, otherwise ./evidence in the repo
 EVIDENCE_DIR = Path(os.environ.get('SIFT_EVIDENCE_DIR') or Path(__file__).resolve().parent.parent / 'evidence').resolve()
-ALLOWED_TOOLS = {'windows.info', 'windows.pslist', 'windows.netscan', 'windows.cmdline'}
+# The approved tool list lives in allowlist.json beside this file; SIFT_ALLOWLIST can point elsewhere
+ALLOWLIST_FILE = Path(os.environ.get('SIFT_ALLOWLIST') or Path(__file__).resolve().parent / 'allowlist.json')
+
+def load_allowlist(path: Path = ALLOWLIST_FILE) -> set:
+    tools = json.loads(Path(path).read_text(encoding='utf-8')).get('tools')
+    if not isinstance(tools, list) or not tools or not all(isinstance(t, str) and t.startswith('windows.') for t in tools):
+        raise ValueError('allowlist.json needs a non-empty "tools" list of windows.* plugin names')
+    return set(tools)
+
+ALLOWED_TOOLS = load_allowlist()
 
 class ToolNotAllowed(Exception):
     pass
