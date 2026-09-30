@@ -1,6 +1,6 @@
 # sift-agent
 
-sift-agent is a small memory forensics agent. It gives a Gemini model four read-only Volatility 3 plugins, lets it investigate a Windows memory image on its own, and then checks every claim it makes against a log of what the tools really returned. It is a research prototype, not a production tool.
+sift-agent is a small memory forensics agent. It gives a Gemini model a small set of read-only Volatility 3 plugins (four by default, eight with the extended allowlist), lets it investigate a Windows memory image on its own, and then checks every claim it makes against a log of what the tools really returned. It is a research prototype, not a production tool.
 
 ## What it does
 
@@ -28,7 +28,7 @@ The key is read only from the environment and is never written to disk. Volatili
 
     .venv/bin/python -m pytest -q
 
-The 34 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
+The 54 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
 
 ## What has been tested for real
 
@@ -58,3 +58,7 @@ MIT, see LICENSE. Volatility 3 has its own licence (the Volatility Software Lice
 `python -m sift_agent replay --runs runs` rebuilds the report from a saved run with no model, Volatility or network, and re-validates every finding against the raw outputs. `python -m sift_agent verify-audit --runs runs` re-hashes every raw output against the audit log and exits non-zero on a mismatch or a missing file; every log line also stores the hash of the previous line and its own hash, so an edited, deleted, inserted or reordered line is reported too. Logs written before the chain existed are reported as unchained, not failed. The chain proves the log was not changed after it was written, but someone who rewrites every line and every hash from the start would not be caught. `run --dump-hash` dumps the most suspicious processes with windows.dumpfiles (falling back to windows.pslist --dump), SHA-256 hashes each process's executable image and lists them in the report, and `--vt` also looks each hash up on VirusTotal using VT_API_KEY (free tier, one request every 15.5 seconds). Images rebuilt from memory can differ from the file on disk where pages were never loaded, so a VirusTotal miss proves nothing. Each finding carries a confidence derived from the evidence: high when a verified claim cites two or more different plugins, medium for one plugin, low for anything that failed verification.
 
 `python -m sift_agent timeline --runs runs --out timeline.html` writes a static HTML page with one row per tool call and the report claims that cite it. `python -m sift_agent compare runs-a runs-b` diffs the confirmed claims of two saved runs, for example from two different models, and lists disagreements. The approved plugin list is in sift_agent/allowlist.json (or the file named by SIFT_ALLOWLIST), and only windows.* names are accepted. `run --runs DIR` chooses where the audit log, raw outputs and dumps are written.
+
+The default allowlist is the four plugins the project was specified against. `SIFT_ALLOWLIST=sift_agent/allowlist-extended.json` adds windows.psscan, windows.psxview, windows.netstat and windows.malfind, which cover hidden processes, connections on newer Windows and injected code. The system prompt and tool schemas follow whichever allowlist is loaded. `run --yara RULES` scans the dumped process images with a YARA rules file or directory (sift_agent/rules has two small generic rules) and needs the optional yara-python package. A run prints the audit log head hash on stderr; keep it somewhere outside the run directory and pass it to `verify-audit --expect-head HASH` to detect a rewrite of the whole chain.
+
+A second case was run for real on MemLabs Lab 4 (Windows 7 SP1 x64, 1 GB) with the extended allowlist. It used 8 of 15 calls, ran all eight plugins, and flagged DumpIt.exe, the memory acquisition tool, as anomalous. This is one run with no accuracy scoring, so treat it as a smoke test and not a result.
