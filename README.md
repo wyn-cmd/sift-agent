@@ -52,3 +52,9 @@ This is a training and portfolio exercise against public samples with known grou
 ## Licence
 
 MIT, see LICENSE. Volatility 3 has its own licence (the Volatility Software License) and is installed from PyPI and called only as a subprocess, so none of its code is included here.
+
+## Extra commands
+
+`python -m sift_agent replay --runs runs` rebuilds the report from a saved run with no model, Volatility or network, and re-validates every finding against the raw outputs. `python -m sift_agent verify-audit --runs runs` re-hashes every raw output against the audit log and exits non-zero on a mismatch or a missing file; it cannot detect an edited log line because the log is not hash-chained. `run --dump-hash` dumps the most suspicious processes with windows.pslist --dump, SHA-256 hashes the images and lists them in the report, and `--vt` also looks each hash up on VirusTotal using VT_API_KEY (free tier, one request every 15.5 seconds). Dumped images come from memory and usually differ from the file on disk, so a VirusTotal miss proves nothing. Each finding carries a confidence derived from the evidence: high when a verified claim cites two or more different plugins, medium for one plugin, low for anything that failed verification.
+
+`python -m sift_agent timeline --runs runs --out timeline.html` writes a static HTML page with one row per tool call and the report claims that cite it. `python -m sift_agent compare runs-a runs-b` diffs the confirmed claims of two saved runs, for example from two different models, and lists disagreements. The approved plugin list is in sift_agent/allowlist.json (or the file named by SIFT_ALLOWLIST), and only windows.* names are accepted. `run --runs DIR` chooses where the audit log, raw outputs and dumps are written.
