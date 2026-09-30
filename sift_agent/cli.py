@@ -12,6 +12,8 @@ from sift_agent.report import generate_report
 from sift_agent.verify import verify_audit
 from sift_agent.replay import replay
 from sift_agent.vt import VirusTotal
+from sift_agent.verify import head_hash
+from sift_agent.yarascan import load_rules
 from sift_agent.timeline import build_timeline
 from sift_agent.compare import compare_runs
 
@@ -25,9 +27,11 @@ def main():
 
     run_parser.add_argument('--runs', default='runs', help='Directory for audit.jsonl, raw/ and dumps/')
     run_parser.add_argument('--dump-hash', action='store_true', help='Dump the most suspicious processes, SHA-256 the images and list the hashes')
+    run_parser.add_argument('--yara', metavar='RULES', help='Scan dumped images with a YARA rules file or directory (needs yara-python, implies --dump-hash)')
     run_parser.add_argument('--vt', action='store_true', help='Look the dumped hashes up on VirusTotal (needs VT_API_KEY, implies --dump-hash)')
 
     verify_parser = subparsers.add_parser('verify-audit', help='Check the raw outputs in a runs directory against the audit log')
+    verify_parser.add_argument('--expect-head', help='Head hash you recorded after the run; fails if the log no longer ends at it')
     verify_parser.add_argument('--runs', default='runs', help='Directory holding audit.jsonl and raw/')
 
     replay_parser = subparsers.add_parser('replay', help='Rebuild the report from a saved run without a model or Volatility')
@@ -58,7 +62,9 @@ def main():
             sys.exit(1)
         return
     if args.command == 'verify-audit':
-        ok, lines = verify_audit(Path(args.runs) / 'audit.jsonl')
+        ok, lines = verify_audit(Path(args.runs) / 'audit.jsonl', args.expect_head)
+        if (Path(args.runs) / 'audit.jsonl').exists():
+            lines.append(f"head hash: {head_hash(Path(args.runs) / 'audit.jsonl')}")
         print('\n'.join(lines))
         print('OK: audit log matches the raw outputs' if ok else 'FAILED: audit log does not match the raw outputs')
         sys.exit(0 if ok else 1)
@@ -97,8 +103,15 @@ def main():
             if vt is None:
                 print("Error: --vt needs the VT_API_KEY environment variable.", file=sys.stderr)
                 sys.exit(1)
-        dump_dir = Path(args.runs) / 'dumps' if (args.dump_hash or args.vt) else None
-        agent = Agent(llm, runner, audit_log, rate_limiter, str(ev_path), dump_dir=dump_dir, vt=vt)
+        dump_dir = Path(args.runs) / 'dumps' if (args.dump_hash or args.vt or args.yara) else None
+        yara_rules = None
+        if args.yara:
+            try:
+                yara_rules = load_rules(Path(args.yara))
+            except Exception as e:
+                print(f"Error loading YARA rules: {e}", file=sys.stderr)
+                sys.exit(1)
+        agent = Agent(llm, runner, audit_log, rate_limiter, str(ev_path), dump_dir=dump_dir, vt=vt, yara_rules=yara_rules)
         # Surface API failures as a clean error and log them instead of a traceback
         try:
             final_answer = agent.build_report()
@@ -107,6 +120,8 @@ def main():
             print(f"Error during investigation: {str(e)[:300]}", file=sys.stderr)
             sys.exit(2)
         print(final_answer)
+        # Note this value somewhere outside the run directory to make later tampering detectable
+        print(f"Audit log head hash: {head_hash(Path(args.runs) / 'audit.jsonl')}", file=sys.stderr)
     else:
         parser.print_help()
 

@@ -3,11 +3,22 @@ import json
 from pathlib import Path
 from sift_agent.audit import GENESIS, entry_hash
 
+# Hash of the last chained line. Recording it outside the log makes a full rewrite detectable.
+def head_hash(log_path: Path) -> str:
+    last = GENESIS
+    for line in Path(log_path).read_text(encoding='utf-8').splitlines():
+        if line.strip():
+            try:
+                last = json.loads(line).get('line_sha256', last)
+            except json.JSONDecodeError:
+                continue
+    return last
+
 # Re-check the log in two ways: every line's own hash and its link to the previous line (catches
 # edited, deleted, inserted or reordered lines), and every tool call's raw file on disk (catches
 # edited or missing raw output). Lines written before the chain existed carry no hash and are
 # reported as unchained rather than failed.
-def verify_audit(log_path: Path) -> tuple[bool, list[str]]:
+def verify_audit(log_path: Path, expect_head: str | None = None) -> tuple[bool, list[str]]:
     log_path = Path(log_path)
     problems = []
     if not log_path.exists():
@@ -52,4 +63,6 @@ def verify_audit(log_path: Path) -> tuple[bool, list[str]]:
     head = [f'{checked} tool calls checked']
     if unchained:
         head.append(f'{unchained} lines have no hash chain (written by an older version)')
+    if expect_head is not None and log_path.exists() and head_hash(log_path) != expect_head:
+        problems.append('head hash does not match the value you recorded (log was rewritten or truncated)')
     return not problems, head + problems
