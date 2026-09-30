@@ -11,7 +11,7 @@ from sift_agent.dump import dump_and_hash, format_hash_section
 # System prompt embodying the five required clauses
 SYSTEM_PROMPT = (
     "You are a DFIR investigation agent analyzing memory dumps using volatility3 plugins.\n"
-    "1. You may only request the 4 listed tools: windows.info, windows.pslist, windows.netscan, windows.cmdline.\n"
+    f"1. You may only request the {len(ALLOWED_TOOLS)} listed tools: {', '.join(sorted(ALLOWED_TOOLS))}.\n"
     "2. Every factual claim must cite a tool_call_id else label as inference.\n"
     "3. No ground truth, reason only from tool outputs.\n"
     "4. Report tool failures as data and say whether retried or moved on.\n"
@@ -27,28 +27,10 @@ SYSTEM_PROMPT = (
     "Do not use outside knowledge about specific samples, and say plainly when the evidence is not enough to judge."
 )
 
-# Flat Gemini function schemas for the four allowed tools
+# Flat Gemini function schemas, generated from the allowlist so config and schema cannot drift
 TOOL_SCHEMAS = [
-    {
-        'name': 'windows.info',
-        'description': 'Run windows.info plugin',
-        'parameters': {'type': 'object', 'properties': {}, 'required': []}
-    },
-    {
-        'name': 'windows.pslist',
-        'description': 'Run windows.pslist plugin',
-        'parameters': {'type': 'object', 'properties': {}, 'required': []}
-    },
-    {
-        'name': 'windows.netscan',
-        'description': 'Run windows.netscan plugin',
-        'parameters': {'type': 'object', 'properties': {}, 'required': []}
-    },
-    {
-        'name': 'windows.cmdline',
-        'description': 'Run windows.cmdline plugin',
-        'parameters': {'type': 'object', 'properties': {}, 'required': []}
-    }
+    {'name': t, 'description': f'Run {t} plugin', 'parameters': {'type': 'object', 'properties': {}, 'required': []}}
+    for t in sorted(ALLOWED_TOOLS)
 ]
 
 # Protocol defining small LLM client interface
@@ -57,7 +39,8 @@ class LLMClient(Protocol):
         ...
 
 class Agent:
-    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str, require_all_tools: bool = True, max_nudges: int = 3, dump_dir=None, vt=None):
+    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str, require_all_tools: bool = True, max_nudges: int = 3, dump_dir=None, vt=None, yara_rules=None):
+        self.yara_rules = yara_rules
         self.pslist_call_id = None
         self.dump_dir = dump_dir
         self.vt = vt
@@ -119,7 +102,7 @@ class Agent:
             pslist_id = self.pslist_call_id
             raw = self.audit_log.read_raw(pslist_id) if pslist_id else None
             if raw:
-                results = dump_and_hash(self.runner, self.evidence_path, raw, self.dump_dir, self.audit_log, self.vt)
+                results = dump_and_hash(self.runner, self.evidence_path, raw, self.dump_dir, self.audit_log, self.vt, yara_rules=self.yara_rules)
                 if results:
                     extra = format_hash_section(results)
         return generate_report(parse_findings(answer), self.audit_log, self.truncated_plugins,
@@ -177,7 +160,7 @@ class Agent:
                     self.tools_run.add(tool_name)
                     plugin_name = tool_name.split('.')[1]
                     retcode, stdout, stderr = self.runner.run(tool_name, self.evidence_path)
-                    processed, failed, truncated = process_output(stdout, stderr, retcode)
+                    processed, failed, truncated = process_output(stdout, stderr, retcode, tool_name)
                     if truncated and plugin_name not in self.truncated_plugins:
                         self.truncated_plugins.append(plugin_name)
 

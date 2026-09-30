@@ -22,7 +22,7 @@ def replay(runs_dir: Path) -> str:
             calls += 1
             tools_run.add(e['tool'])
             raw = audit.read_raw(e['tool_call_id']) or ''
-            if process_output(raw, '', 0)[2]:
+            if process_output(raw, '', 0, e.get('tool', ''))[2]:
                 name = e['tool'].split('.')[-1]
                 if name not in truncated:
                     truncated.append(name)
