@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 from sift_agent.tools import suspicion_score
+from sift_agent.yarascan import scan_file
 
 # Pick the PIDs of the most suspicious pslist rows, using the column header to find PID and name
 def pick_pids(pslist_raw: str, limit: int = 3, min_score: int = 4) -> list[tuple[int, str]]:
@@ -38,7 +39,7 @@ def sha256_file(path: Path) -> str:
 
 # Dump each picked process, hash every file the dump produced, and optionally look the hash up.
 # The audit log gets one event per process so the result can be traced later.
-def dump_and_hash(runner, evidence: str, pslist_raw: str, dump_dir: Path, audit_log, vt=None, limit: int = 3) -> list[dict]:
+def dump_and_hash(runner, evidence: str, pslist_raw: str, dump_dir: Path, audit_log, vt=None, limit: int = 3, yara_rules=None) -> list[dict]:
     results = []
     dump_dir = Path(dump_dir)
     dump_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +62,8 @@ def dump_and_hash(runner, evidence: str, pslist_raw: str, dump_dir: Path, audit_
         for p in files:
             digest = sha256_file(p)
             item = {'file': p.name, 'sha256': digest, 'size': p.stat().st_size}
+            if yara_rules is not None:
+                item['yara'] = scan_file(yara_rules, p)
             if vt is not None:
                 item['virustotal'] = vt.lookup(digest)
             entry['files'].append(item)
@@ -77,6 +80,8 @@ def format_hash_section(results: list[dict]) -> list[str]:
             lines.append(f"  Error: {r['error']}")
         for f in r['files']:
             lines.append(f"  {f['file']} sha256 {f['sha256']} ({f['size']} bytes)")
+            if 'yara' in f:
+                lines.append(f"  YARA: {', '.join(f['yara']) if f['yara'] else 'no rule matched'}")
             vt = f.get('virustotal')
             if vt is None:
                 continue
