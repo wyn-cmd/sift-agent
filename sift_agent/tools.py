@@ -11,6 +11,8 @@ SYSTEM_NAMES = {
     'fontdrvhost.exe', 'spoolsv.exe', 'taskhostw.exe', 'sihost.exe', 'ctfmon.exe',
     'searchindexer.exe', 'runtimebroker.exe', 'conhost.exe', 'dllhost.exe',
     'wmiprvse.exe', 'audiodg.exe', 'memcompression', 'msmpeng.exe', 'lsaiso.exe',
+    # Names that are normal on Windows Vista and 7
+    'lsm.exe', 'taskhost.exe', 'taskeng.exe', 'searchprotocolhost.exe', 'searchfilterhost.exe', 'logonui.exe',
 }
 # Interpreters and living-off-the-land binaries that attackers commonly abuse
 LOLBINS = {
@@ -87,7 +89,7 @@ class SubprocessRunner:
         except Exception as e:
             return 1, '', str(e)
 
-def process_output(stdout: str, stderr: str, returncode: int) -> tuple[str, bool, bool]:
+def process_output(stdout: str, stderr: str, returncode: int, plugin: str = '') -> tuple[str, bool, bool]:
     # Warnings on stderr are benign, but a non-zero exit is a failure even if Volatility already
     # printed its banner and column header, so an empty table from a crash is never read as "no rows"
     failed = returncode != 0
@@ -112,8 +114,19 @@ def process_output(stdout: str, stderr: str, returncode: int) -> tuple[str, bool
     header = lines[0]
     data_lines = [l for l in lines[1:] if l.strip()]
 
+    # malfind prints each hit as a block with hexdump and disassembly lines that only make sense
+    # in order, so it is capped rather than re-ranked
+    if plugin == 'windows.malfind':
+        truncated = len(data_lines) > 200
+        return '\n'.join([header] + data_lines[:200]), False, truncated
+
     def score_line(line: str) -> int:
-        return suspicion_score(line)
+        score = suspicion_score(line)
+        # psxview marks a process False for each view that cannot see it; a hidden process is one
+        # that a scan finds but the active process list does not
+        if plugin == 'windows.psxview' and 'False' in line.split('\t'):
+            score += 3
+        return score
 
     # Sort to put suspicious rows first
     sorted_data = sorted(data_lines, key=score_line, reverse=True)
