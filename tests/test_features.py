@@ -81,3 +81,45 @@ def test_virustotal_404_and_rate_spacing():
     assert vt.lookup('a' * 64)['found'] is False
     vt.lookup('b' * 64)
     assert naps and naps[0] == 15
+
+
+# The hash chain catches an edited line, a deleted line and a reordered pair
+def test_audit_chain_detects_line_edits(tmp_path):
+    audit = AuditLog(tmp_path / 'audit.jsonl')
+    for i in range(3):
+        audit.log_tool('windows.pslist', {'n': i}, f'out {i}')
+    log = tmp_path / 'audit.jsonl'
+    good = log.read_text().splitlines()
+    assert verify_audit(log)[0]
+    log.write_text('\n'.join([good[0], good[1].replace('"n": 1', '"n": 9'), good[2]]) + '\n')
+    assert any('line hash mismatch' in p for p in verify_audit(log)[1])
+    log.write_text('\n'.join([good[0], good[2]]) + '\n')
+    assert any('chain broken' in p for p in verify_audit(log)[1])
+    log.write_text('\n'.join([good[0], good[2], good[1]]) + '\n')
+    assert not verify_audit(log)[0]
+
+# Lines from before the chain existed are reported, not failed
+def test_verify_accepts_legacy_lines(tmp_path):
+    import hashlib
+    (tmp_path / 'raw').mkdir()
+    (tmp_path / 'raw' / 'x.txt').write_text('hi')
+    e = {'tool_call_id': 'x', 'raw_output_file': 'raw/x.txt', 'raw_output_len': 2, 'raw_output_sha256': hashlib.sha256(b'hi').hexdigest()}
+    (tmp_path / 'audit.jsonl').write_text(json.dumps(e) + '\n')
+    ok, lines = verify_audit(tmp_path / 'audit.jsonl')
+    assert ok and any('no hash chain' in l for l in lines)
+
+class BothRunner:
+    def dump_files(self, evidence, pid, out_dir):
+        (__import__('pathlib').Path(out_dir) / f'file.0x1.0x2.ImageSectionObject.reader_sl.exe.img').write_bytes(b'MZ img')
+        (__import__('pathlib').Path(out_dir) / f'file.0x1.0x2.ImageSectionObject.kernel32.dll.img').write_bytes(b'MZ dll')
+        return 0, '', ''
+    def dump(self, evidence, pid, out_dir):
+        raise AssertionError('fallback must not run when dumpfiles works')
+
+# dumpfiles is preferred and only the process's own image is kept; a failing dumpfiles falls back
+def test_dumpfiles_preferred_with_fallback(tmp_path):
+    audit = AuditLog(tmp_path / 'audit.jsonl')
+    res = dump_and_hash(BothRunner(), 'e', PSLIST, tmp_path / 'd1', audit)
+    assert res[0]['method'] == 'windows.dumpfiles' and [f['file'] for f in res[0]['files']] == ['file.0x1.0x2.ImageSectionObject.reader_sl.exe.img']
+    res = dump_and_hash(DumpRunner(), 'e', PSLIST, tmp_path / 'd2', audit)
+    assert res[0]['method'] == 'windows.pslist --dump'
