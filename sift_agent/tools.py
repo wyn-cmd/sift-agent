@@ -68,6 +68,15 @@ class SubprocessRunner:
         except Exception as e:
             return 1, '', str(e)
 
+    # Dump one process image into out_dir with windows.pslist --dump; the caller hashes the files
+    def dump(self, evidence_path: str, pid: int, out_dir: str) -> tuple[int, str, str]:
+        cmd = [find_vol(), '-q', '-f', evidence_path, '-o', out_dir, 'windows.pslist', '--pid', str(pid), '--dump']
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            return res.returncode, res.stdout, res.stderr
+        except Exception as e:
+            return 1, '', str(e)
+
 def process_output(stdout: str, stderr: str, returncode: int) -> tuple[str, bool, bool]:
     # Warnings on stderr are benign, but a non-zero exit is a failure even if Volatility already
     # printed its banner and column header, so an empty table from a crash is never read as "no rows"
