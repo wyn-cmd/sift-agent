@@ -166,6 +166,10 @@ class Agent:
                     plugin_name = tool_name.split('.')[1]
                     retcode, stdout, stderr = self.runner.run(tool_name, self.evidence_path)
                     processed, failed, truncated = process_output(stdout, stderr, retcode, tool_name)
+                    # A failed call is recorded as its own event, so the report can count failures
+                    # per plugin instead of inferring them from the raw text, and so can the page
+                    if failed:
+                        self.audit_log.log_event('tool call failed', {'tool': tool_name, 'retcode': retcode})
                     if truncated and plugin_name not in self.truncated_plugins:
                         self.truncated_plugins.append(plugin_name)
 
