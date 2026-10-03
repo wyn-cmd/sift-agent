@@ -7,6 +7,7 @@ import re
 from sift_agent.rate_limiter import RateLimiter, DailyLimitReached
 from sift_agent.report import generate_report, parse_findings
 from sift_agent.dump import dump_and_hash, format_hash_section
+from sift_agent.injection import banner_for
 
 # System prompt embodying the five required clauses
 SYSTEM_PROMPT = (
@@ -173,10 +174,15 @@ class Agent:
                     if truncated and plugin_name not in self.truncated_plugins:
                         self.truncated_plugins.append(plugin_name)
 
-                    if failed:
-                        processed_data = f"[UNTRUSTED TOOL OUTPUT FAILED: retcode={retcode}] {processed}"
-                    else:
-                        processed_data = f"[UNTRUSTED TOOL OUTPUT] {processed}"
+                    # Text found in plugin output is evidence, not instruction. If it reads like an order
+                    # to the model, say so in the same message and record it so the report can list it.
+                    notice = banner_for(processed)
+                    if notice:
+                        self.audit_log.log_event('prompt injection markers in tool output',
+                                                 {'tool': tool_name, 'notice': notice})
+                    label = f"[UNTRUSTED TOOL OUTPUT FAILED: retcode={retcode}]" if failed else "[UNTRUSTED TOOL OUTPUT]"
+                    # The label stays in front so the model still sees the payload marked as untrusted data
+                    processed_data = f"{label} {notice}\n{processed}" if notice else f"{label} {processed}"
 
                     call_id = self.audit_log.log_tool(tool_name, call.get('arguments', {}) or {}, stdout + ('\n[stderr]\n' + stderr if failed and stderr else ''), processed)
                     if tool_name == 'windows.pslist' and not failed:
