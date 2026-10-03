@@ -55,7 +55,7 @@ def validate_findings(findings: List[Dict[str, Any]], audit_log: AuditLog) -> Li
 
     return validated_findings
 
-def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncated_plugins: List[str], calls_used: int, rate_limit_approached: bool, plugins_not_run: List[str] | None = None, extra_sections: List[str] | None = None) -> str:
+def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncated_plugins: List[str], calls_used: int, rate_limit_approached: bool, plugins_not_run: List[str] | None = None, extra_sections: List[str] | None = None, calls_cap: int = 15) -> str:
     validated_findings = validate_findings(findings, audit_log)
     report_lines = ['# DFIR Investigation Report', '', '## Findings']
     for vf in validated_findings:
@@ -72,7 +72,7 @@ def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncat
     report_lines.extend([
         '## Limitations',
         f"- Truncated plugins: {', '.join(truncated_plugins) if truncated_plugins else 'None'}",
-        f"- Calls used vs cap: {calls_used} / 15",
+        f"- Calls used vs cap: {calls_used} / {calls_cap}",
         f"- Plugins never run: {', '.join(plugins_not_run) if plugins_not_run else 'None'}",
         f"- Rate limit approached: {'Yes' if rate_limit_approached else 'No'}"
     ])

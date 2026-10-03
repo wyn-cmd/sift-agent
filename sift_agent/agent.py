@@ -39,7 +39,11 @@ class LLMClient(Protocol):
         ...
 
 class Agent:
-    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str, require_all_tools: bool = True, max_nudges: int = 3, dump_dir=None, vt=None, yara_rules=None):
+    def __init__(self, llm: LLMClient, runner: Runner, audit_log: AuditLog, rate_limiter: RateLimiter, evidence_path: str, require_all_tools: bool = True, max_nudges: int = 3, dump_dir=None, vt=None, yara_rules=None, max_calls: int = 15):
+        # A smaller cap keeps a run cheap on the free tier; a larger one lets a slow model finish
+        if max_calls < 1:
+            raise ValueError('max_calls must be at least 1')
+        self.max_calls = max_calls
         self.yara_rules = yara_rules
         self.pslist_call_id = None
         self.dump_dir = dump_dir
@@ -84,7 +88,7 @@ class Agent:
         missing = self.missing_tools()
         if not self.require_all_tools or not missing:
             return False
-        if self.nudges >= self.max_nudges or self.tool_calls_count >= 15:
+        if self.nudges >= self.max_nudges or self.tool_calls_count >= self.max_calls:
             return False
         self.nudges += 1
         messages.append({'role': 'user', 'content': 'You have not yet run: ' + ', '.join(missing) +
@@ -106,14 +110,15 @@ class Agent:
                 if results:
                     extra = format_hash_section(results)
         return generate_report(parse_findings(answer), self.audit_log, self.truncated_plugins,
-                               self.tool_calls_count, self.rate_limit_approached, self.missing_tools(), extra)
+                               self.tool_calls_count, self.rate_limit_approached, self.missing_tools(), extra,
+                               calls_cap=self.max_calls)
 
     def run(self) -> str:
         messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
         concluded = False
         final_answer = 'Investigation completed.'
 
-        while not concluded and self.tool_calls_count < 15:
+        while not concluded and self.tool_calls_count < self.max_calls:
             text_len = sum(len(m.get('content', '')) for m in messages)
             try:
                 self.rate_limiter.check_and_consume(estimated_tokens=max(100, text_len // 4))
@@ -138,7 +143,7 @@ class Agent:
 
             if 'tool_calls' in response and response['tool_calls']:
                 for call in response['tool_calls']:
-                    if self.tool_calls_count >= 15:
+                    if self.tool_calls_count >= self.max_calls:
                         concluded = True
                         break
 
