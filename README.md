@@ -28,7 +28,7 @@ The key is read only from the environment and is never written to disk. Volatili
 
     .venv/bin/python -m pytest -q
 
-The 68 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
+The 72 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
 
 ## What has been tested for real
 
@@ -67,3 +67,5 @@ A second case was run for real on MemLabs Lab 4 (Windows 7 SP1 x64, 1 GB) with t
 ## Offline analysis commands
 
 These work on a saved run directory with no model, Volatility or network. `tree` draws the process tree from windows.pslist and stars processes whose parent is missing. `anomalies` applies fixed rules (wrong parent for system processes, duplicate singletons, lookalike names, system processes outside session 0, a child created before its parent); the output is a list of leads, not verdicts. `iocs --format text|json|csv` lists public IP addresses, URLs, domains and hashes found in the raw outputs, skipping private addresses and PDB symbol GUIDs. `stats` summarises calls, raw output sizes and duration. `export-json` prints the validated findings and call hashes as JSON. `replay` now takes `--out FILE`, `--redact` (masks IP addresses, user names in profile paths and UNC host names) and `--extras` (appends the tree and anomalies). `doctor` checks Python, Volatility, the API key, the Gemini library, the evidence directory and the allowlist, and exits non-zero if a required item is missing. `hash-evidence --evidence FILE` prints the SHA-256 of the image so a report can name exactly what it describes.
+
+`netmap` groups windows.netscan and windows.netstat rows by owning process and marks external remote addresses. `cmdflags` flags unusual windows.cmdline entries (encoded PowerShell, hidden windows, download cradles, script host binaries, writable paths, URLs); these are leads, and legitimate software can match. `--version` prints the package version, and CHANGELOG.md lists what changed in each release.
