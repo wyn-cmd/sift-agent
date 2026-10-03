@@ -28,7 +28,7 @@ The key is read only from the environment and is never written to disk. Volatili
 
     .venv/bin/python -m pytest -q
 
-The 54 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
+The 68 tests use fake models and fake Volatility runners, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion and a prompt injection attempt.
 
 ## What has been tested for real
 
@@ -62,3 +62,8 @@ MIT, see LICENSE. Volatility 3 has its own licence (the Volatility Software Lice
 The default allowlist is the four plugins the project was specified against. `SIFT_ALLOWLIST=sift_agent/allowlist-extended.json` adds windows.psscan, windows.psxview, windows.netstat and windows.malfind, which cover hidden processes, connections on newer Windows and injected code. The system prompt and tool schemas follow whichever allowlist is loaded. `run --yara RULES` scans the dumped process images with a YARA rules file or directory (sift_agent/rules has two small generic rules) and needs the optional yara-python package. A run prints the audit log head hash on stderr; keep it somewhere outside the run directory and pass it to `verify-audit --expect-head HASH` to detect a rewrite of the whole chain.
 
 A second case was run for real on MemLabs Lab 4 (Windows 7 SP1 x64, 1 GB) with the extended allowlist. It used 8 of 15 calls, ran all eight plugins, and flagged DumpIt.exe, the memory acquisition tool, as anomalous. This is one run with no accuracy scoring, so treat it as a smoke test and not a result.
+
+
+## Offline analysis commands
+
+These work on a saved run directory with no model, Volatility or network. `tree` draws the process tree from windows.pslist and stars processes whose parent is missing. `anomalies` applies fixed rules (wrong parent for system processes, duplicate singletons, lookalike names, system processes outside session 0, a child created before its parent); the output is a list of leads, not verdicts. `iocs --format text|json|csv` lists public IP addresses, URLs, domains and hashes found in the raw outputs, skipping private addresses and PDB symbol GUIDs. `stats` summarises calls, raw output sizes and duration. `export-json` prints the validated findings and call hashes as JSON. `replay` now takes `--out FILE`, `--redact` (masks IP addresses, user names in profile paths and UNC host names) and `--extras` (appends the tree and anomalies). `doctor` checks Python, Volatility, the API key, the Gemini library, the evidence directory and the allowlist, and exits non-zero if a required item is missing. `hash-evidence --evidence FILE` prints the SHA-256 of the image so a report can name exactly what it describes.
