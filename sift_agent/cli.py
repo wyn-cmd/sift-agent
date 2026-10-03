@@ -1,4 +1,5 @@
 import os
+from sift_agent import __version__
 import sys
 import argparse
 from pathlib import Path
@@ -22,6 +23,8 @@ from sift_agent.iocs import extract_iocs, format_iocs
 from sift_agent.stats import run_stats
 from sift_agent.doctor import run_doctor, format_doctor
 from sift_agent.redact import redact
+from sift_agent.netmap import netmap_from_run
+from sift_agent.cmdflags import cmdflags_from_run
 from sift_agent.export import export_json, evidence_hash_line
 
 def main():
@@ -57,7 +60,7 @@ def main():
     replay_parser.add_argument('--extras', action='store_true', help='Append the process tree and rule-based anomalies')
 
     for name, text in (('tree', 'Print the process tree of a saved run'), ('anomalies', 'Rule-based process checks on a saved run (no model)'),
-                       ('stats', 'Summarise the calls, sizes and duration of a saved run'), ('export-json', 'Print validated findings as JSON')):
+                       ('netmap', 'Group network connections by owning process, flagging external addresses'), ('cmdflags', 'Flag unusual command lines in a saved run'), ('stats', 'Summarise the calls, sizes and duration of a saved run'), ('export-json', 'Print validated findings as JSON')):
         p = subparsers.add_parser(name, help=text)
         p.add_argument('--runs', default='runs')
     iocs_parser = subparsers.add_parser('iocs', help='List IPs, URLs, domains and hashes found in the raw outputs of a saved run')
@@ -67,6 +70,7 @@ def main():
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
 
+    parser.add_argument('--version', action='version', version=f'sift-agent {__version__}')
     args = parser.parse_args()
     if args.command == 'doctor':
         ok, text = format_doctor(run_doctor())
@@ -79,7 +83,7 @@ def main():
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
         return
-    simple = {'tree': tree_from_run, 'anomalies': anomalies_from_run, 'stats': run_stats, 'export-json': export_json,
+    simple = {'tree': tree_from_run, 'anomalies': anomalies_from_run, 'stats': run_stats, 'netmap': netmap_from_run, 'cmdflags': cmdflags_from_run, 'export-json': export_json,
               'iocs': lambda r: format_iocs(extract_iocs(r), getattr(args, 'format', 'text'))}
     if args.command in simple:
         try:
