@@ -16,6 +16,13 @@ from sift_agent.verify import head_hash
 from sift_agent.yarascan import load_rules
 from sift_agent.timeline import build_timeline
 from sift_agent.compare import compare_runs
+from sift_agent.ptree import tree_from_run
+from sift_agent.anomalies import anomalies_from_run
+from sift_agent.iocs import extract_iocs, format_iocs
+from sift_agent.stats import run_stats
+from sift_agent.doctor import run_doctor, format_doctor
+from sift_agent.redact import redact
+from sift_agent.export import export_json, evidence_hash_line
 
 def main():
     parser = argparse.ArgumentParser(description='Sift Agent CLI')
@@ -45,7 +52,42 @@ def main():
     compare_parser.add_argument('run_a')
     compare_parser.add_argument('run_b')
 
+    replay_parser.add_argument('--redact', action='store_true', help='Mask IP addresses, user names and host names in the report')
+    replay_parser.add_argument('--out', help='Write the report to this file instead of printing it')
+    replay_parser.add_argument('--extras', action='store_true', help='Append the process tree and rule-based anomalies')
+
+    for name, text in (('tree', 'Print the process tree of a saved run'), ('anomalies', 'Rule-based process checks on a saved run (no model)'),
+                       ('stats', 'Summarise the calls, sizes and duration of a saved run'), ('export-json', 'Print validated findings as JSON')):
+        p = subparsers.add_parser(name, help=text)
+        p.add_argument('--runs', default='runs')
+    iocs_parser = subparsers.add_parser('iocs', help='List IPs, URLs, domains and hashes found in the raw outputs of a saved run')
+    iocs_parser.add_argument('--runs', default='runs')
+    iocs_parser.add_argument('--format', choices=['text', 'json', 'csv'], default='text')
+    subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
+    hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
+    hash_parser.add_argument('--evidence', required=True)
+
     args = parser.parse_args()
+    if args.command == 'doctor':
+        ok, text = format_doctor(run_doctor())
+        print(text)
+        sys.exit(0 if ok else 1)
+    if args.command == 'hash-evidence':
+        try:
+            print(evidence_hash_line(validate_path(args.evidence)))
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    simple = {'tree': tree_from_run, 'anomalies': anomalies_from_run, 'stats': run_stats, 'export-json': export_json,
+              'iocs': lambda r: format_iocs(extract_iocs(r), getattr(args, 'format', 'text'))}
+    if args.command in simple:
+        try:
+            print(simple[args.command](Path(args.runs)))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
     if args.command == 'timeline':
         try:
             Path(args.out).write_text(build_timeline(Path(args.runs)), encoding='utf-8')
@@ -70,7 +112,16 @@ def main():
         sys.exit(0 if ok else 1)
     if args.command == 'replay':
         try:
-            print(replay(Path(args.runs)))
+            text = replay(Path(args.runs))
+            if args.extras:
+                text += '\n\n## Process tree\n' + tree_from_run(Path(args.runs)) + '\n\n## Rule-based anomalies\n' + anomalies_from_run(Path(args.runs))
+            if args.redact:
+                text = redact(text)
+            if args.out:
+                Path(args.out).write_text(text + '\n', encoding='utf-8')
+                print(f'Wrote {args.out}')
+            else:
+                print(text)
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
