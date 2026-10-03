@@ -26,6 +26,14 @@ from sift_agent.redact import redact
 from sift_agent.netmap import netmap_from_run
 from sift_agent.cmdflags import cmdflags_from_run
 from sift_agent.export import export_json, evidence_hash_line
+from sift_agent.search import search_run, format_search, json_search
+from sift_agent.risk import risk_report, format_risk
+from sift_agent.injection import scan_runs, format_injection
+from sift_agent.stix import stix_from_run
+from sift_agent.sigma import sigma_from_run
+from sift_agent.htmlreport import write_html
+from sift_agent.bundle import write_bundle
+import json
 
 def main():
     parser = argparse.ArgumentParser(description='Sift Agent CLI')
@@ -39,6 +47,8 @@ def main():
     run_parser.add_argument('--dump-hash', action='store_true', help='Dump the most suspicious processes, SHA-256 the images and list the hashes')
     run_parser.add_argument('--yara', metavar='RULES', help='Scan dumped images with a YARA rules file or directory (needs yara-python, implies --dump-hash)')
     run_parser.add_argument('--vt', action='store_true', help='Look the dumped hashes up on VirusTotal (needs VT_API_KEY, implies --dump-hash)')
+    run_parser.add_argument('--max-calls', type=int, default=15, help='Tool call cap for this run (default 15)')
+    run_parser.add_argument('--max-nudges', type=int, default=3, help='How often to push a model that tries to stop early (default 3)')
 
     verify_parser = subparsers.add_parser('verify-audit', help='Check the raw outputs in a runs directory against the audit log')
     verify_parser.add_argument('--expect-head', help='Head hash you recorded after the run; fails if the log no longer ends at it')
@@ -66,6 +76,44 @@ def main():
     iocs_parser = subparsers.add_parser('iocs', help='List IPs, URLs, domains and hashes found in the raw outputs of a saved run')
     iocs_parser.add_argument('--runs', default='runs')
     iocs_parser.add_argument('--format', choices=['text', 'json', 'csv'], default='text')
+
+    search_parser = subparsers.add_parser('search', help='Search the raw plugin outputs of a saved run with a regular expression')
+    search_parser.add_argument('pattern')
+    search_parser.add_argument('--runs', default='runs')
+    search_parser.add_argument('--plugin', action='append', dest='plugins', help='Search only this plugin, repeat for several')
+    search_parser.add_argument('-i', '--ignore-case', action='store_true', help='Case insensitive match')
+    search_parser.add_argument('-C', '--context', type=int, default=0, help='Lines of context to show around each hit')
+    search_parser.add_argument('--max-hits', type=int, default=200, help='Stop after this many hits (default 200)')
+    search_parser.add_argument('--json', action='store_true', help='Print the hits as JSON')
+
+    risk_parser = subparsers.add_parser('risk', help='Rank processes by one score fused from the rule-based checks')
+    risk_parser.add_argument('--runs', default='runs')
+    risk_parser.add_argument('--json', action='store_true', help='Print the scored processes as JSON')
+
+    injection_parser = subparsers.add_parser('injection', help='Flag raw output that looks like prompt injection aimed at the model')
+    injection_parser.add_argument('--runs', default='runs')
+    injection_parser.add_argument('--json', action='store_true', help='Print the findings as JSON')
+
+    stix_parser = subparsers.add_parser('stix', help='Export the indicators of a saved run as a STIX 2.1 bundle')
+    stix_parser.add_argument('--runs', default='runs')
+    stix_parser.add_argument('--created', help='Fixed timestamp to use instead of now, for reproducible output')
+    stix_parser.add_argument('--out', help='Write to this file instead of printing')
+
+    sigma_parser = subparsers.add_parser('sigma', help='Turn the flagged command lines of a saved run into Sigma rules')
+    sigma_parser.add_argument('--runs', default='runs')
+    sigma_parser.add_argument('--out', help='Write to this file instead of printing')
+
+    html_parser = subparsers.add_parser('html-report', help='Write one self contained HTML page for a saved run')
+    html_parser.add_argument('--runs', default='runs')
+    html_parser.add_argument('--out', default='report.html')
+    html_parser.add_argument('--title', help='Heading to use instead of the run directory name')
+    html_parser.add_argument('--redact', action='store_true', help='Mask IP addresses, user names and host names')
+
+    bundle_parser = subparsers.add_parser('bundle', help='Package a saved run into one zip with a hash manifest')
+    bundle_parser.add_argument('--runs', default='runs')
+    bundle_parser.add_argument('--out', help='Zip to write (default: the run directory name plus -bundle.zip)')
+    bundle_parser.add_argument('--evidence', help='Evidence image to hash into the manifest, relative to the evidence directory')
+    bundle_parser.add_argument('--redact', action='store_true', help='Redact the copy of the report inside the bundle')
     subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
@@ -130,6 +178,66 @@ def main():
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
         return
+    if args.command == 'search':
+        try:
+            result = search_run(Path(args.runs), args.pattern, plugins=args.plugins, ignore_case=args.ignore_case,
+                                context=args.context, max_hits=args.max_hits)
+            print(json_search(result) if args.json else format_search(result))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    if args.command == 'risk':
+        try:
+            report = risk_report(Path(args.runs))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps(report, indent=2) if args.json else format_risk(report))
+        return
+    if args.command == 'injection':
+        try:
+            found = scan_runs(Path(args.runs))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps(found, indent=2) if args.json else format_injection(found))
+        return
+    if args.command in ('stix', 'sigma'):
+        try:
+            text = stix_from_run(Path(args.runs), args.created) if args.command == 'stix' else sigma_from_run(Path(args.runs))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        if args.out:
+            Path(args.out).write_text(text + '\n', encoding='utf-8')
+            print(f'Wrote {args.out}')
+        else:
+            print(text)
+        return
+    if args.command == 'html-report':
+        try:
+            out = write_html(Path(args.runs), Path(args.out), args.title, args.redact)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(f'Wrote {out}')
+        return
+    if args.command == 'bundle':
+        try:
+            evidence = validate_path(args.evidence) if args.evidence else None
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        out = Path(args.out) if args.out else Path(f'{Path(args.runs).name}-bundle.zip')
+        try:
+            info = write_bundle(Path(args.runs), out, evidence, args.redact)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Wrote {info['out']} ({info['bytes']} bytes, {len(info['entries'])} entries)")
+        print(f"manifest sha256: {info['manifest_sha256']}")
+        return
     if args.command == 'run':
         try:
             ev_path = validate_path(args.evidence)
@@ -166,7 +274,8 @@ def main():
             except Exception as e:
                 print(f"Error loading YARA rules: {e}", file=sys.stderr)
                 sys.exit(1)
-        agent = Agent(llm, runner, audit_log, rate_limiter, str(ev_path), dump_dir=dump_dir, vt=vt, yara_rules=yara_rules)
+        agent = Agent(llm, runner, audit_log, rate_limiter, str(ev_path), dump_dir=dump_dir, vt=vt, yara_rules=yara_rules,
+                      max_calls=args.max_calls, max_nudges=args.max_nudges)
         # Surface API failures as a clean error and log them instead of a traceback
         try:
             final_answer = agent.build_report()
