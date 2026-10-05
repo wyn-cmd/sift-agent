@@ -28,7 +28,7 @@ The key is read only from the environment and is never written to disk. Volatili
 
     .venv/bin/python -m pytest -q
 
-The 120 tests use fake models, fake Volatility runners and synthetic run directories, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion, a prompt injection attempt, the tool call cap, and every offline command against a saved run, including the HTML page and the handover bundle.
+The 147 tests use fake models, fake Volatility runners and synthetic run directories, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion, a prompt injection attempt, the tool call cap, and every offline command against a saved run, including the HTML page and the handover bundle.
 
 ## What has been tested for real
 
