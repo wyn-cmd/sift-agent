@@ -23,6 +23,7 @@ from sift_agent.iocs import extract_iocs, format_iocs
 from sift_agent.stats import run_stats
 from sift_agent.doctor import run_doctor, format_doctor
 from sift_agent.redact import redact
+from sift_agent.procdiff import diff_runs
 from sift_agent.summary import run_summary
 from sift_agent.netmap import netmap_from_run
 from sift_agent.cmdflags import cmdflags_from_run
@@ -117,6 +118,9 @@ def main():
     bundle_parser.add_argument('--redact', action='store_true', help='Redact the copy of the report inside the bundle')
     p = subparsers.add_parser('summary', help='Counts of findings, confidence and anomalies for a saved run')
     p.add_argument('--runs', default='runs')
+    p = subparsers.add_parser('procdiff', help='Compare the process names of two saved runs')
+    p.add_argument('run_a')
+    p.add_argument('run_b')
     subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
@@ -137,6 +141,13 @@ def main():
     if args.command == 'summary':
         try:
             print(run_summary(Path(args.runs)))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    if args.command == 'procdiff':
+        try:
+            print(diff_runs(Path(args.run_a), Path(args.run_b)))
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
