@@ -53,7 +53,14 @@ def validate_findings(findings: List[Dict[str, Any]], audit_log: AuditLog) -> Li
             'reason': f.get('reason', '')
         })
 
-    return validated_findings
+    # The model sometimes repeats a finding; keep the first copy of each exact repeat (same claim, status, cited calls and excerpt)
+    seen, unique = set(), []
+    for vf in validated_findings:
+        key = (vf['claim'].strip().lower(), vf['status'], tuple(sorted(vf.get('tool_call_ids', []))), (vf.get('excerpt') or '').strip())
+        if key not in seen:
+            seen.add(key)
+            unique.append(vf)
+    return unique
 
 def generate_report(findings: List[Dict[str, Any]], audit_log: AuditLog, truncated_plugins: List[str], calls_used: int, rate_limit_approached: bool, plugins_not_run: List[str] | None = None, extra_sections: List[str] | None = None, calls_cap: int = 15) -> str:
     validated_findings = validate_findings(findings, audit_log)
