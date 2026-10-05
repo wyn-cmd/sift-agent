@@ -2,6 +2,10 @@
 
 ## 0.3.0
 
+Added summary, procdiff, hidden, lineage, timeline-csv, window, pidinfo and baseline commands. The audit log lookup is now indexed, the plugin timeout can be set with SIFT_PLUGIN_TIMEOUT, the table parser tolerates CRLF and stderr sections, offline commands skip damaged audit lines, and repeated findings are collapsed.
+
+## 0.3.0
+
 Added seven offline commands that read a saved run and need no model, no Volatility and no network. `search` matches a regular expression across the raw plugin outputs, with `--plugin`, `-i`, `-C` for context, `--max-hits` and `--json`. `risk` fuses the rule anomalies, the flagged command lines, the public connections and the low listening ports into one score per process, capped and sorted so the top of the list is where to read first. `injection` flags lines in plugin output that read like instructions aimed at the model, and the same check now runs inside the agent loop, where a notice is prepended to the message the model sees and the hit is logged as an event. `stix` exports the indicators of a run as a STIX 2.1 bundle with deterministic ids. `sigma` turns the flagged command lines into Sigma rules as YAML text with no dependencies. `html-report` writes one self contained dark themed HTML page with the summary, the findings and every offline section in it. `bundle` writes a zip of the run with a hash manifest, so the recipient can tell whether anything changed.
 
 The tool call cap and the nudge count are options on `run` now (`--max-calls`, `--max-nudges`) and the chosen cap is carried into the report instead of a hardcoded 15.
