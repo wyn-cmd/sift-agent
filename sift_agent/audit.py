@@ -75,17 +75,23 @@ class AuditLog:
         f = self.raw_dir / f'{tool_call_id}.txt'
         return f.read_text(encoding='utf-8') if f.exists() else None
 
+    # Entries are indexed by call id, and the index is rebuilt only when the file size or mtime changes,
+    # so validating many findings does not re-read the whole log once per cited id
     def lookup(self, tool_call_id: str) -> dict | None:
         if not self.log_path.exists():
             return None
-        with open(self.log_path, 'r', encoding='utf-8') as f:
-            for line in f:
+        st = self.log_path.stat()
+        key = (st.st_mtime_ns, st.st_size)
+        if getattr(self, '_idx_key', None) != key:
+            idx = {}
+            for line in self.log_path.read_text(encoding='utf-8').splitlines():
                 if not line.strip():
                     continue
                 try:
                     data = json.loads(line)
-                    if data.get('tool_call_id') == tool_call_id:
-                        return data
                 except json.JSONDecodeError:
                     continue
-        return None
+                if 'tool_call_id' in data:
+                    idx.setdefault(data['tool_call_id'], data)
+            self._idx, self._idx_key = idx, key
+        return self._idx.get(tool_call_id)
