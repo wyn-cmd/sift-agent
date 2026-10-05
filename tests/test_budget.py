@@ -45,7 +45,7 @@ def test_cap_below_one_is_refused(tmp_path):
     class L:
         def chat(self, messages, tools):
             return {'content': '[]'}
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='max_calls'):
         make(tmp_path, L(), max_calls=0)
 
 # The cap also bounds the nudge loop, so a stubborn model cannot be pushed past it
@@ -54,6 +54,6 @@ def test_nudge_respects_the_cap(tmp_path):
         def chat(self, messages, tools):
             return {'content': '[]', 'conclude': True}
     a = make(tmp_path, L(), max_calls=1, max_nudges=5)
-    # the cap is already used up, so no further nudge is sent even though plugins are missing
+    # The cap is already used up, so no further nudge is sent even though plugins are missing
     a.tool_calls_count = 1
     assert a.nudge_if_early([]) is False
