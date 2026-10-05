@@ -3,7 +3,9 @@ from pathlib import Path
 
 # Split a Volatility TSV table into dict rows keyed by the header, skipping the banner and blank lines
 def parse_table(raw: str) -> list[dict]:
-    rows = [l for l in raw.splitlines() if l.strip() and not l.startswith('Volatility 3 Framework')]
+    # Stop at the [stderr] marker appended to failed plugin output, and tolerate Windows line endings
+    body = raw.replace('\r', '').split('\n[stderr]')[0]
+    rows = [l for l in body.splitlines() if l.strip() and not l.startswith('Volatility 3 Framework')]
     if len(rows) < 2:
         return []
     header = [h.strip() for h in rows[0].split('\t')]
