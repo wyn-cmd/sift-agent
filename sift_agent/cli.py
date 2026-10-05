@@ -23,6 +23,7 @@ from sift_agent.iocs import extract_iocs, format_iocs
 from sift_agent.stats import run_stats
 from sift_agent.doctor import run_doctor, format_doctor
 from sift_agent.redact import redact
+from sift_agent.pidinfo import pidinfo_from_run
 from sift_agent.window import window_from_run
 from sift_agent.timelinecsv import timeline_csv
 from sift_agent.lineage import lineage_from_run
@@ -136,6 +137,9 @@ def main():
     p.add_argument('--runs', default='runs')
     p.add_argument('--start', required=True)
     p.add_argument('--end', required=True)
+    p = subparsers.add_parser('pidinfo', help='Show process row, command line, sockets and parent chain for one PID')
+    p.add_argument('--runs', default='runs')
+    p.add_argument('--pid', type=int, required=True)
     subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
@@ -191,6 +195,13 @@ def main():
     if args.command == 'window':
         try:
             print(window_from_run(Path(args.runs), args.start, args.end))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    if args.command == 'pidinfo':
+        try:
+            print(pidinfo_from_run(Path(args.runs), args.pid))
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
