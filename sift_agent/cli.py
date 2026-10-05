@@ -23,6 +23,7 @@ from sift_agent.iocs import extract_iocs, format_iocs
 from sift_agent.stats import run_stats
 from sift_agent.doctor import run_doctor, format_doctor
 from sift_agent.redact import redact
+from sift_agent.summary import run_summary
 from sift_agent.netmap import netmap_from_run
 from sift_agent.cmdflags import cmdflags_from_run
 from sift_agent.export import export_json, evidence_hash_line
@@ -114,6 +115,8 @@ def main():
     bundle_parser.add_argument('--out', help='Zip to write (default: the run directory name plus -bundle.zip)')
     bundle_parser.add_argument('--evidence', help='Evidence image to hash into the manifest, relative to the evidence directory')
     bundle_parser.add_argument('--redact', action='store_true', help='Redact the copy of the report inside the bundle')
+    p = subparsers.add_parser('summary', help='Counts of findings, confidence and anomalies for a saved run')
+    p.add_argument('--runs', default='runs')
     subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
@@ -128,6 +131,13 @@ def main():
         try:
             print(evidence_hash_line(validate_path(args.evidence)))
         except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    if args.command == 'summary':
+        try:
+            print(run_summary(Path(args.runs)))
+        except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
         return
