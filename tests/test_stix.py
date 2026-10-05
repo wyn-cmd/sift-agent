@@ -33,8 +33,9 @@ def test_hash_types():
 
 def test_deterministic():
     iocs = {'ip': ['1.1.1.1']}
-    b1 = build_stix(iocs)
-    b2 = build_stix(iocs)
+    # Fix the timestamp: two builds in different milliseconds otherwise differ
+    b1 = build_stix(iocs, '2026-01-01T00:00:00.000Z')
+    b2 = build_stix(iocs, '2026-01-01T00:00:00.000Z')
     assert b1 == b2
 
 def test_quoting():
