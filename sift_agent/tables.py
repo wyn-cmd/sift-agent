@@ -16,6 +16,19 @@ def parse_table(raw: str) -> list[dict]:
     return out
 
 # Load the raw output of every call of one plugin from a saved run, in log order
+# Yield the dict entries of an audit log, skipping blank lines and lines that are not valid JSON,
+# so one damaged line does not stop an offline command; verify-audit is where damage is reported
+def iter_entries(log: Path):
+    for line in Path(log).read_text(encoding='utf-8').splitlines():
+        if not line.strip():
+            continue
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(e, dict):
+            yield e
+
 def raw_for(runs_dir: Path, plugin: str) -> list[str]:
     log = Path(runs_dir) / 'audit.jsonl'
     if not log.exists():
