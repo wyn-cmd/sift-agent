@@ -4,7 +4,7 @@ import ipaddress
 import json
 import re
 from pathlib import Path
-from sift_agent.tables import raw_for
+from sift_agent.tables import iter_entries, raw_for
 
 IP_RE = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
 URL_RE = re.compile(r'https?://[^\s"\'<>\\]+', re.I)
@@ -26,10 +26,7 @@ def extract_iocs(runs_dir: Path) -> dict:
     if not log.exists():
         raise FileNotFoundError(f'no audit.jsonl in {runs_dir}')
     found = {'ip': set(), 'url': set(), 'hash': set(), 'domain': set()}
-    for line in log.read_text(encoding='utf-8').splitlines():
-        if not line.strip():
-            continue
-        e = json.loads(line)
+    for e in iter_entries(log):
         if 'raw_output_file' not in e:
             continue
         p = Path(runs_dir) / e['raw_output_file']

@@ -1,6 +1,7 @@
 import json
 from collections import Counter
 from pathlib import Path
+from sift_agent.tables import iter_entries
 
 # One-screen summary of a saved run: calls per plugin, output sizes, failures, run duration
 def run_stats(runs_dir: Path) -> str:
@@ -8,10 +9,7 @@ def run_stats(runs_dir: Path) -> str:
     if not log.exists():
         raise FileNotFoundError(f'no audit.jsonl in {runs_dir}')
     per, sizes, events, stamps = Counter(), {}, Counter(), []
-    for line in log.read_text(encoding='utf-8').splitlines():
-        if not line.strip():
-            continue
-        e = json.loads(line)
+    for e in iter_entries(log):
         stamps.append(e.get('ts', ''))
         if 'tool_call_id' in e:
             per[e['tool']] += 1

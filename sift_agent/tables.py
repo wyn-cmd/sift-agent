@@ -36,10 +36,7 @@ def raw_for(runs_dir: Path, plugin: str) -> list[str]:
     if not log.exists():
         raise FileNotFoundError(f'no audit.jsonl in {runs_dir}')
     out = []
-    for line in log.read_text(encoding='utf-8').splitlines():
-        if not line.strip():
-            continue
-        e = json.loads(line)
+    for e in iter_entries(log):
         if e.get('tool') == plugin and 'raw_output_file' in e:
             p = Path(runs_dir) / e['raw_output_file']
             if p.is_file():
