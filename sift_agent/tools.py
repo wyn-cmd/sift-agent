@@ -1,3 +1,4 @@
+import os
 import subprocess
 import shutil
 import sys
@@ -60,12 +61,21 @@ class Runner(Protocol):
     def run(self, plugin: str, evidence_path: str) -> tuple[int, str, str]:
         ...
 
+# Seconds one plugin may run. SIFT_PLUGIN_TIMEOUT overrides the 60 second default for large images;
+# a value that is not a positive number is ignored
+def plugin_timeout(default: float = 60) -> float:
+    try:
+        value = float(os.environ.get('SIFT_PLUGIN_TIMEOUT', ''))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
 class SubprocessRunner:
     def run(self, plugin: str, evidence_path: str) -> tuple[int, str, str]:
         # Run volatility via subprocess with list args, never shell=True
         cmd = [find_vol(), '-q', '-f', evidence_path, plugin]
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=plugin_timeout())
             return res.returncode, res.stdout, res.stderr
         except Exception as e:
             return 1, '', str(e)
