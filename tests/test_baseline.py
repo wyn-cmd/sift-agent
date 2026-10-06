@@ -20,3 +20,8 @@ def test_baseline_all_known_and_empty(tmp_path):
         assert False
     except ValueError:
         pass
+
+def test_default_baseline_is_used_without_a_file(tmp_path):
+    run, _ = make_run(tmp_path / 'run', {'windows.pslist': "PID\tPPID\tImageFileName\n4\t0\tSystem\n9\t4\tmystery.exe\n"})
+    out = baseline_from_run(run)
+    assert 'mystery.exe: not in baseline (PIDs 9)' in out and 'System' not in out

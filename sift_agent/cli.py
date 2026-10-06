@@ -145,7 +145,7 @@ def main():
     p.add_argument('--pid', type=int, required=True)
     p = subparsers.add_parser('baseline', help='List processes that are not in a baseline file of known-good names')
     p.add_argument('--runs', default='runs')
-    p.add_argument('--names', required=True, help='Text file with one known-good process name per line')
+    p.add_argument('--names', help='Text file with one known-good process name per line; the bundled core Windows list is used if omitted')
     p = subparsers.add_parser('ports', help='Summarise listening and remote ports from netscan and netstat')
     p.add_argument('--runs', default='runs')
     p = subparsers.add_parser('exits', help='List processes that have already exited, shortest lifetime first')
@@ -219,7 +219,7 @@ def main():
         return
     if args.command == 'baseline':
         try:
-            print(baseline_from_run(Path(args.runs), Path(args.names)))
+            print(baseline_from_run(Path(args.runs), Path(args.names) if args.names else None))
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
