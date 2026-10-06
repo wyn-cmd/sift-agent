@@ -21,3 +21,12 @@ def test_summary_without_answer_raises(tmp_path):
         assert False
     except ValueError:
         pass
+
+def test_summary_json_matches_text(tmp_path):
+    log = AuditLog(tmp_path / 'audit.jsonl')
+    cid = log.log_tool('windows.pslist', {}, 'PID\tPPID\tImageFileName\n4\t0\tSystem\n')
+    ans = json.dumps([{'claim': 'System runs', 'status': 'confirmed', 'tool_call_ids': [cid], 'excerpt': '4\t0\tSystem'}])
+    log.log_event('final model answer', {'answer': ans})
+    data = json.loads(run_summary(tmp_path, as_json=True))
+    assert data['tool_calls'] == 1 and data['findings'] == 1 and data['by_status'] == {'confirmed': 1}
+    assert data['confidence']['medium'] == 1 and data['processes'] == 1 and data['anomalies'] == 0

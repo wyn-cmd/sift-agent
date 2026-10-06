@@ -126,6 +126,7 @@ def main():
     bundle_parser.add_argument('--evidence', help='Evidence image to hash into the manifest, relative to the evidence directory')
     bundle_parser.add_argument('--redact', action='store_true', help='Redact the copy of the report inside the bundle')
     p = subparsers.add_parser('summary', help='Counts of findings, confidence and anomalies for a saved run')
+    p.add_argument('--json', action='store_true', help='Print the counts as a JSON object')
     p.add_argument('--runs', default='runs')
     p = subparsers.add_parser('procdiff', help='Compare the process names of two saved runs')
     p.add_argument('run_a')
@@ -173,7 +174,7 @@ def main():
         return
     if args.command == 'summary':
         try:
-            print(run_summary(Path(args.runs)))
+            print(run_summary(Path(args.runs), args.json))
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
