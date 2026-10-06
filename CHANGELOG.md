@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+Added ports, exits and defang commands. `window` now treats a short end bound such as a date as covering the whole period, `baseline` falls back to a bundled core Windows list, `summary` can print JSON, `cmdflags` flags log tampering, account creation and persistence setup, and a test checks that every subcommand has working help.
+
 ## 0.3.0
 
 Added summary, procdiff, hidden, lineage, timeline-csv, window, pidinfo and baseline commands. The audit log lookup is now indexed, the plugin timeout can be set with SIFT_PLUGIN_TIMEOUT, the table parser tolerates CRLF and stderr sections, offline commands skip damaged audit lines, and repeated findings are collapsed.
