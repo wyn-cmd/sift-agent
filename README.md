@@ -28,7 +28,7 @@ The key is read only from the environment and is never written to disk. Volatili
 
     .venv/bin/python -m pytest -q
 
-The 147 tests use fake models, fake Volatility runners and synthetic run directories, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion, a prompt injection attempt, the tool call cap, and every offline command against a saved run, including the HTML page and the handover bundle.
+The 162 tests use fake models, fake Volatility runners and synthetic run directories, so they need neither a key nor an image. They cover the guardrails, the ranking, the audit log, the report checks, the early-stop nudge, the Gemini message conversion, a prompt injection attempt, the tool call cap, and every offline command against a saved run, including the HTML page and the handover bundle.
 
 ## What has been tested for real
 
@@ -75,3 +75,5 @@ Seven more commands work the same way, reading a saved run with no model, no Vol
 More offline commands: `summary` prints counts of findings, confidence and anomalies. `procdiff RUN_A RUN_B` compares process names between two saved runs. `hidden` compares windows.psscan with windows.pslist and separates processes with no exit time (possibly hidden) from ones that have exited; it needs the extended allowlist. `lineage --pid N` prints the parent chain of a process and says when a parent is missing or the chain loops. `window --start T --end T` lists processes created in a time range. `pidinfo --pid N` gathers the process row, command line, sockets and parent chain. `timeline-csv` prints every audit entry as CSV. `baseline --names FILE` lists processes whose names are not in a file of known-good names.
 
 Set `SIFT_PLUGIN_TIMEOUT` (seconds) to give Volatility longer than the default 60 seconds on large images. Offline commands skip damaged audit lines and `verify-audit` is where damage is reported. If the model repeats the same claim with the same status, only the first copy appears in the report.
+
+`ports` summarises listening ports and remote ports from netscan and netstat and lists remote ports outside a common set. `exits [--under SECONDS]` lists processes that have already exited with how long they lived. `defang` prints the indicators of a run with dots in brackets and http written as hxxp. `window` accepts a bare date as the end bound and then includes that whole day. `baseline` uses a bundled list of core Windows process names when `--names` is left out. `summary --json` prints the counts as a JSON object.
