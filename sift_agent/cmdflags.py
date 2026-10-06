@@ -11,6 +11,9 @@ PATTERNS = [
     (re.compile(r'(downloadstring|invoke-webrequest|iwr |certutil.*-urlcache|bitsadmin.*/transfer)', re.I), 'download cradle'),
     (re.compile(r'(rundll32|regsvr32|mshta|wscript|cscript)', re.I), 'script host or proxy binary'),
     (re.compile(r'https?://', re.I), 'URL in the arguments'),
+    (re.compile(r'(vssadmin.*delete\s+shadows|wbadmin.*delete|bcdedit.*recoveryenabled\s+no|wevtutil\s+cl\b)', re.I), 'backup, recovery or log tampering'),
+    (re.compile(r'(net1?\s+user\s+\S+.*/add|net1?\s+localgroup\s+administrators.*/add)', re.I), 'local account creation'),
+    (re.compile(r'(schtasks.*/create|reg(\.exe)?\s+add.*\\run\b|sc(\.exe)?\s+create)', re.I), 'persistence setup'),
 ]
 
 # Scan windows.cmdline rows for the patterns above; returns (pid, process, reason, args)
