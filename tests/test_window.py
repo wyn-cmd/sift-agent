@@ -24,3 +24,13 @@ def test_window_empty_and_reversed(tmp_path):
         assert False
     except ValueError:
         pass
+
+def test_window_end_date_covers_the_whole_day(tmp_path):
+    run, _ = make_run(tmp_path, {'windows.pslist': PS})
+    out = window_from_run(run, '2012-07-22', '2012-07-22')
+    assert 'a.exe' in out and 'b.exe' in out and 'c.exe' not in out
+
+def test_window_minute_precision_end(tmp_path):
+    run, _ = make_run(tmp_path, {'windows.pslist': PS})
+    out = window_from_run(run, '2012-07-22 02:00', '2012-07-22 02:40')
+    assert 'a.exe' in out and 'b.exe' not in out
