@@ -7,10 +7,11 @@ def window_from_run(runs_dir: Path, start: str, end: str) -> str:
     rows = rows_for(runs_dir, 'windows.pslist')
     if not rows:
         raise ValueError('the run has no usable windows.pslist output')
-    if start > end:
+    # A short bound such as a bare date covers the whole period: compare only as many characters as it has
+    if start[:len(end)] > end:
         raise ValueError('--start is after --end')
     # Sort on time then PID only; two processes can share a timestamp and dicts cannot be compared
-    hits = sorted(((r['CreateTime'], r) for r in rows if r.get('CreateTime', 'N/A') not in ('N/A', '') and start <= r['CreateTime'] <= end),
+    hits = sorted(((r['CreateTime'], r) for r in rows if r.get('CreateTime', 'N/A') not in ('N/A', '') and start <= r['CreateTime'] and r['CreateTime'][:len(end)] <= end),
                   key=lambda x: (x[0], int(x[1]['PID']) if x[1]['PID'].isdigit() else 0))
     if not hits:
         return 'no processes were created in that window.'
