@@ -1,0 +1,25 @@
+# Core Windows process names, lowercase. A short starting list, not a full baseline of any host.
+system
+registry
+smss.exe
+csrss.exe
+wininit.exe
+winlogon.exe
+services.exe
+lsass.exe
+lsm.exe
+svchost.exe
+explorer.exe
+spoolsv.exe
+taskhost.exe
+taskhostw.exe
+dwm.exe
+conhost.exe
+searchindexer.exe
+rundll32.exe
+dllhost.exe
+sihost.exe
+ctfmon.exe
+wmiprvse.exe
+memory compression
+secure system
