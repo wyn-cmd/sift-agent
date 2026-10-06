@@ -23,6 +23,7 @@ from sift_agent.iocs import extract_iocs, format_iocs
 from sift_agent.stats import run_stats
 from sift_agent.doctor import run_doctor, format_doctor
 from sift_agent.redact import redact
+from sift_agent.defang import defang_from_run
 from sift_agent.exits import exits_from_run
 from sift_agent.ports import ports_from_run
 from sift_agent.baseline import baseline_from_run
@@ -151,6 +152,8 @@ def main():
     p = subparsers.add_parser('exits', help='List processes that have already exited, shortest lifetime first')
     p.add_argument('--runs', default='runs')
     p.add_argument('--under', type=float, default=60.0, help='Lifetime in seconds below which a process is marked short')
+    p = subparsers.add_parser('defang', help='Print the indicators of a saved run in defanged form')
+    p.add_argument('--runs', default='runs')
     subparsers.add_parser('doctor', help='Check that Volatility, the API key and the evidence directory are ready')
     hash_parser = subparsers.add_parser('hash-evidence', help='Print the SHA-256 of an evidence file')
     hash_parser.add_argument('--evidence', required=True)
@@ -234,6 +237,13 @@ def main():
     if args.command == 'exits':
         try:
             print(exits_from_run(Path(args.runs), args.under))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+    if args.command == 'defang':
+        try:
+            print(defang_from_run(Path(args.runs)))
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
