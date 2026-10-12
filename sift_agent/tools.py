@@ -4,6 +4,7 @@ import shutil
 import sys
 from pathlib import Path
 import re
+from typing import Protocol, List, Dict, Any
 
 # Names that normally appear on a clean Windows host; anything else scores higher
 SYSTEM_NAMES = {
@@ -15,20 +16,26 @@ SYSTEM_NAMES = {
     # Names that are normal on Windows Vista and 7
     'lsm.exe', 'taskhost.exe', 'taskeng.exe', 'searchprotocolhost.exe', 'searchfilterhost.exe', 'logonui.exe',
 }
+
 # Interpreters and living-off-the-land binaries that attackers commonly abuse
 LOLBINS = {
     'cmd.exe', 'powershell.exe', 'pwsh.exe', 'wscript.exe', 'cscript.exe',
     'mshta.exe', 'rundll32.exe', 'regsvr32.exe', 'certutil.exe', 'bitsadmin.exe',
     'nc.exe', 'ncat.exe', 'psexec.exe',
 }
+
 # Ports that are routine for Windows services and browsing
 COMMON_PORTS = {53, 67, 68, 80, 123, 135, 137, 138, 139, 389, 443, 445, 500, 1900, 3389, 5353, 5355}
-EXE_RE = re.compile(r'[\w.\-]+\.exe', re.IGNORECASE)
-# ip:port, or an address column followed by a port column
-PORT_RES = [re.compile(r'\d{1,3}(?:\.\d{1,3}){3}:(\d{1,5})\b'), re.compile(r'\d{1,3}(?:\.\d{1,3}){3}\s+(\d{1,5})\b')]
 
-# Generic heuristic, deliberately blind to any specific case: unknown binaries, abusable
-# binaries, and non-routine ports below the ephemeral range
+EXE_RE = re.compile(r'[\w.\-]+\.exe', re.IGNORECASE)
+
+# ip:port, or an address column followed by a port column
+PORT_RES = [
+    re.compile(r'\d{1,3}(?:\.\d{1,3}){3}:(\d{1,5})\b'),
+    re.compile(r'\d{1,3}(?:\.\d{1,3}){3}\s+(\d{1,5})\b')
+]
+
+# Generic heuristic, deliberately blind to any specific case: unknown binaries, abusable binaries, and non-routine ports below the ephemeral range
 def suspicion_score(line: str) -> int:
     score = 0
     names = [n.lower() for n in EXE_RE.findall(line)]
@@ -37,17 +44,18 @@ def suspicion_score(line: str) -> int:
             score += 5
         elif name not in SYSTEM_NAMES:
             score += 4
+            
     # A shell or interpreter spawned by a non-system process is a stronger signal
     if len(names) >= 2 and names[0] not in SYSTEM_NAMES and any(n in LOLBINS for n in names[1:]):
         score += 3
+        
     for rx in PORT_RES:
         for m in rx.findall(line):
             port = int(m)
             if port not in COMMON_PORTS and 0 < port < 49152:
                 score += 4
+                
     return score
-
-from typing import Protocol, List, Dict, Any
 
 # Prefer vol on PATH, then the one installed beside the running interpreter
 def find_vol() -> str:
@@ -61,8 +69,7 @@ class Runner(Protocol):
     def run(self, plugin: str, evidence_path: str) -> tuple[int, str, str]:
         ...
 
-# Seconds one plugin may run. SIFT_PLUGIN_TIMEOUT overrides the 60 second default for large images;
-# a value that is not a positive number is ignored
+# Seconds one plugin may run. SIFT_PLUGIN_TIMEOUT overrides the 60 second default for large images; a value that is not a positive number is ignored
 def plugin_timeout(default: float = 60) -> float:
     try:
         value = float(os.environ.get('SIFT_PLUGIN_TIMEOUT', ''))
@@ -80,8 +87,7 @@ class SubprocessRunner:
         except Exception as e:
             return 1, '', str(e)
 
-    # Dump a process's mapped files with windows.dumpfiles. This yields the reconstructed .img of
-    # the executable, which is closer to the on-disk file than the pslist memory dump
+    # Dump a process's mapped files with windows.dumpfiles. This yields the reconstructed .img of the executable, which is closer to the on-disk file than the pslist memory dump
     def dump_files(self, evidence_path: str, pid: int, out_dir: str) -> tuple[int, str, str]:
         cmd = [find_vol(), '-q', '-f', evidence_path, '-o', out_dir, 'windows.dumpfiles', '--pid', str(pid)]
         try:
@@ -100,8 +106,7 @@ class SubprocessRunner:
             return 1, '', str(e)
 
 def process_output(stdout: str, stderr: str, returncode: int, plugin: str = '') -> tuple[str, bool, bool]:
-    # Warnings on stderr are benign, but a non-zero exit is a failure even if Volatility already
-    # printed its banner and column header, so an empty table from a crash is never read as "no rows"
+    # Warnings on stderr are benign, but a non-zero exit is a failure even if Volatility already printed its banner and column header, so an empty table from a crash is never read as "no rows"
     failed = returncode != 0
     if failed:
         tail = '\n'.join(stderr.strip().splitlines()[-4:]) or 'no error text'
@@ -113,27 +118,25 @@ def process_output(stdout: str, stderr: str, returncode: int, plugin: str = '') 
     if not lines:
         return stdout, False, False
 
-    # Volatility prints a banner and blank lines before the column header; drop them so the
-    # real header is preserved and ranked rows are only data
+    # Volatility prints a banner and blank lines before the column header; drop them so the real header is preserved and ranked rows are only data
     start = 0
     while start < len(lines) and (not lines[start].strip() or lines[start].startswith('Volatility 3 Framework')):
         start += 1
     lines = lines[start:]
     if not lines:
         return '', False, False
+        
     header = lines[0]
     data_lines = [l for l in lines[1:] if l.strip()]
 
-    # malfind prints each hit as a block with hexdump and disassembly lines that only make sense
-    # in order, so it is capped rather than re-ranked
+    # malfind prints each hit as a block with hexdump and disassembly lines that only make sense in order, so it is capped rather than re-ranked
     if plugin == 'windows.malfind':
         truncated = len(data_lines) > 200
         return '\n'.join([header] + data_lines[:200]), False, truncated
 
     def score_line(line: str) -> int:
         score = suspicion_score(line)
-        # psxview marks a process False for each view that cannot see it; a hidden process is one
-        # that a scan finds but the active process list does not
+        # psxview marks a process False for each view that cannot see it; a hidden process is one that a scan finds but the active process list does not
         if plugin == 'windows.psxview' and 'False' in line.split('\t'):
             score += 3
         return score
