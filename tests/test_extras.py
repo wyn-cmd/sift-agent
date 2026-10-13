@@ -8,6 +8,8 @@ from sift_agent.compare import compare_runs
 PS = 'PID\tImageFileName\n1640\treader_sl.exe\n'
 
 def make_run(path, findings_fn):
+    # Ensure the run directory exists before creating the audit log
+    path.mkdir(parents=True, exist_ok=True)
     audit = AuditLog(path / 'audit.jsonl')
     cid = audit.log_tool('windows.pslist', {}, PS)
     audit.log_event('final model answer', {'answer': json.dumps(findings_fn(cid))})
