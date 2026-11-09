@@ -11,6 +11,9 @@ def _make_id(kind: str, value: str) -> str:
 
 # build stix bundle from iocs dict
 def build_stix(iocs: dict, created: str | None = None) -> dict:
+    if not isinstance(iocs, dict):
+        raise TypeError('iocs must be a dictionary')
+
     if created is None:
         created = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
     
@@ -34,7 +37,11 @@ def build_stix(iocs: dict, created: str | None = None) -> dict:
 
     # indicator objects
     for kind, vals in iocs.items():
+        if not isinstance(vals, (list, set, tuple)):
+            continue
         for val in vals:
+            if not isinstance(val, str):
+                continue
             pattern = None
             if kind == 'ip':
                 pattern = f"[ipv4-addr:value = '{_esc(val)}']"
